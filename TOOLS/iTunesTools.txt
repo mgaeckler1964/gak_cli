@@ -1,0 +1,52 @@
+iTunes Tools (c) 2010-2013 by CRESD GmbH
+----------------------------------------
+
+iTunes Tools ist eine Programmsamlung von verschiedenen nützlichen Tools
+für die Komadozeile rund um iTunes.
+
+Getestest wurde die Sammlung mit 
+- iTunes 7.0 für Windows.
+- itunes 7.3 für Mac OS X 10.4 Power PC
+- iTunes 10.6 für Mac OS X 10.7 für Intel
+
+Folgende Werkzeuge sind derzeit verfügbar:
+
+iTunesCompare lib#1 lib#2
+=========================
+vergleicht zwei iTunes-Bibliotheken und zeigt alle Genres, Künstler, CDs
+und Lieder, die in der zweiten Bibliothek fehlen.
+
+iTunesCheck lib
+===============
+Zeigt alle Lieder in der iTunes-Bibliothek, deren mp3-Dateien nicht gefunden
+werden können.
+
+iTunesCopy lib Wiedergabeliste Zielpfad
+=======================================
+Entfernt alle Dateien, aus dem Zielpfad, die nicht in der Wiedergabeliste
+enthalten sind und kopiert anschließend alle Dateien aus der Wiedergabeliste,
+die auf dem Zielpfad fehlen.
+
+Im Archiv befinden sich Unterverzeichnisse für 
+
+- Mac OS X mit Power PC (darwin_ppc)
+- Mac OS X mit Intel (darwin_x86_64)
+- Raspberry PI mit Debian (linux_arm32)
+- Suse Linux 64-Bit (linux_x86_64)
+- Windows 32-Bit (windows_32)
+
+kopieren Sie das gewünschte Verzeichnis in das Zielsystem und setzen Sie 
+gegenenfalls mit
+
+chmod +x *
+
+das Ausführungsflag.
+
+Die Programme iTunesCheck und iTunesCopy erwarten die gleichen Pfade, wie sie 
+auch iTunes benutzt. Wollen Sie diese Programme unter Linux nutzen, müssen
+Sie die Netzlaufwerke entsprechend mounten. Denken Sie aber daran, daß weder 
+Linux noch Mac OS X mit den Pfaden einer Windowsinstallation anfangen können
+und umgekehrt.
+
+iTunesCompare verwendet nicht die Pfadangaben in der iTunes-Bibliothek und 
+kann daher auf jedem System, jede iTunes-Bibliothek lesen.
