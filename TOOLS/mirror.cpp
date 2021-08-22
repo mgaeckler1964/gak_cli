@@ -1340,10 +1340,12 @@ void CopyThread::ExecuteThread()
 				strRemove( theDestFile );
 				logFile << theSourceFile.fileName << '\n';
 
+				const unsigned consoleWidth = getConsoleWidth();
+				const unsigned padWidth = (consoleWidth - 10)/2;
 				logEntry = "Copy ";
-				logEntry += theSourceFile.fileName.padCopy( 35, STR_P_LEFT );
+				logEntry += theSourceFile.fileName.padCopy( padWidth, STR_P_LEFT );
 				logEntry += " to ";
-				logEntry += theDestFile.padCopy( 35, STR_P_LEFT );
+				logEntry += theDestFile.padCopy( padWidth, STR_P_LEFT );
 				logStrings.push( logEntry );
 
 				try
