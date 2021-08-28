@@ -728,9 +728,11 @@ static void mirror(
 	{
 		Sleep( 1000 );
 
+		static std::size_t	lastCopySize = 0;
+		const std::size_t	copySize = copyQueue.size();
 		delEtaCalculator.addValue(destQueue.size() + deleteQueue.size()+directoryList.size());
 		checkEtaCalculator.addValue(sourceQueue.size());
-		copyEtaCalculator.addValue(copyQueue.size());
+		copyEtaCalculator.addValue(copySize);
 		std::cout << std::setfill( '0' ) << "Mirror " << 
 			(theDestCollector->isRunning ? "DC" : "dc") <<
 			(theDestCollector->isWaiting ? 'W' : '_') <<
@@ -759,15 +761,20 @@ static void mirror(
 			(theCopyFilter->isRunning ? "CF" : "cf") <<
 			(theCopyFilter->isWaiting ? 'W' : '_') <<
 			'/' <<
-			std::setw( COUNT_WIDTH ) << copyQueue.size() <<
+			std::setw( COUNT_WIDTH ) << copySize <<
 			'/' <<
 			std::setw( LOCK_WIDTH ) << theCopyFilter->getLockCount() <<
 			'/' <<
 			(theCopyConsumer->isRunning ? "CT" : "ct") <<
-			(theCopyConsumer->isWaiting ? 'W' : '_') <<
-			std::setw( 3 ) << std::setfill( ' ' ) << (theCopyConsumer->getPermille()/10) << 
-			'.' << (theCopyConsumer->getPermille()%10) << "% "
+			(theCopyConsumer->isWaiting ? 'W' : '_')
 		;
+		if( lastCopySize == copySize && (copySize || theCopyConsumer->getPermille()) )
+		{
+			std::cout << std::setw( 3 ) << std::setfill( ' ' ) << (theCopyConsumer->getPermille()/10) << 
+				'.' << (theCopyConsumer->getPermille()%10) << "% "
+			;
+			lastCopySize = copySize;
+		}
 		Eta<>::ClockTicks	copyTicks = copyEtaCalculator.getETA();
 		Eta<>::ClockTicks	checkTicks = checkEtaCalculator.getETA();
 		Eta<>::ClockTicks	delTicks = delEtaCalculator.getETA();
@@ -780,7 +787,7 @@ static void mirror(
 		{
 			std::cout << " ch " << checkEtaCalculator;
 		}
-		else
+		else if( delTicks )
 		{
 			std::cout << " de " << delEtaCalculator;
 		}
