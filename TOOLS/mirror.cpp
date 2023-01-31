@@ -50,7 +50,7 @@
 
 #include <sys/stat.h>
 
-#include <gak/lockQueue.h>
+#include <gak/condQueue.h>
 #include <gak/cmdlineParser.h>
 #include <gak/thread.h>
 #include <gak/directory.h>
@@ -113,7 +113,7 @@ static CommandLine::Options options[] =
 // --------------------------------------------------------------------- //
 // ----- type definitions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
-typedef Queue<DirectoryEntry> DirectoryQueue;
+typedef CondQueue<DirectoryEntry> DirectoryQueue;
 // --------------------------------------------------------------------- //
 // ----- class definitions --------------------------------------------- //
 // --------------------------------------------------------------------- //
@@ -145,7 +145,6 @@ class CollectorBase : public Thread
 {
 	protected:
 	DirectoryQueue		m_fileQueue;
-	Locker				m_colLock;
 	std::size_t			m_count, m_errorCount, m_maxQueueLen;
 
 	public:
@@ -164,7 +163,11 @@ class CollectorBase : public Thread
 	}
 	Locker &getLocker( void )
 	{
-		return m_colLock;
+		return m_fileQueue.getLocker();
+	}
+	const Locker &getLocker( void ) const
+	{
+		return m_fileQueue.getLocker();
 	}
 	std::size_t getCount( void ) const
 	{
@@ -176,11 +179,11 @@ class CollectorBase : public Thread
 	}
 	int getLockCount( void ) const
 	{
-		return m_colLock.getLockCount();
+		return getLocker().getLockCount();
 	}
 	ThreadID getLockedBy( void ) const
 	{
-		return m_colLock.getLockedBy();
+		return getLocker().getLockedBy();
 	}
 };
 
@@ -349,17 +352,24 @@ class CopyThread : public Thread
 	private:
 	void fcopy( const STRING &src, const STRING &dest )
 	{
-		FileID			srcID = getFileID( src );
-		const STRING	*copiedFile = m_copiedFiles.findValueByKey( srcID );
-		if( copiedFile )
+		FileID	srcID = getFileID( src );
+		if( !srcID )
 		{
-			strRemove( dest );
-			flink( *copiedFile, dest );
+			::fcopy( src, dest, *this );
 		}
 		else
 		{
-			m_copiedFiles[srcID] = dest;
-			::fcopy( src, dest, *this );
+			const STRING	*copiedFile = m_copiedFiles.findValueByKey( srcID );
+			if( copiedFile )
+			{
+				strRemove( dest );
+				flink( *copiedFile, dest );
+			}
+			else
+			{
+				m_copiedFiles[srcID] = dest;
+				::fcopy( src, dest, *this );
+			}
 		}
 	}
 	public:
@@ -657,6 +667,9 @@ static void mirror(
 )
 {
 	doEnterFunction( "mirror" );
+	StopWatch	sw(true);
+	clock_t deleteTime = 0;
+	clock_t copyTime = 0;
 
 	std::auto_ptr<TreeCreator>	theTreeCreator;
 
@@ -726,6 +739,14 @@ static void mirror(
 	Eta<>	copyEtaCalculator;
 	while( theCopyConsumer->isRunning || theDeleteConsumer->isRunning )
 	{
+		if( !deleteTime && !theDeleteConsumer->isRunning )
+		{
+			deleteTime = sw.get<Seconds<>>().asSeconds();
+		}
+		if( !copyTime && !theCopyConsumer->isRunning )
+		{
+			copyTime = sw.get<Seconds<>>().asSeconds();
+		}
 		Sleep( 1000 );
 
 		static std::size_t	lastCopySize = 0;
@@ -815,29 +836,51 @@ static void mirror(
 			logStrings.clear();
 		}
 	}
+	sw.stop();
+	if( !deleteTime )
+	{
+		deleteTime = sw.get<Seconds<>>().asSeconds();
+	}
+	if( !copyTime )
+	{
+		copyTime = sw.get<Seconds<>>().asSeconds();
+	}
+	if( !deleteTime )
+	{
+		deleteTime = 1;
+	}
+	if( !copyTime )
+	{
+		copyTime = 1;
+	}
 
 
 	if( compareMode )
+	{
 		std::cout <<
 			"\nNot Deleted: " << theDeleteFilter->getCount() <<
 			"\nNot Copied : " << theCopyFilter->getCount() <<
 			"\nErrors     : " << theCopyFilter->getErrorCount() <<
 			std::endl
 		;
+	}
 	else
+	{
 		std::cout << 
+		    "\nProcessed : " << theDestCollector->getCount() << '/' << theSourceCollector->getCount() <<
+			"\nPer sec   : " << theDestCollector->getCount() / deleteTime << '/' << theSourceCollector->getCount() / copyTime <<
 			"\nDeleted   : " << theDeleteConsumer->getCount() <<
 			"\nCopied    : " << theCopyConsumer->getCount() <<
 			"\nErrors    : " << theCopyConsumer->getErrorCount() <<
 			"\nACL Errors: " << theCopyConsumer->getAclErrorCount() <<
 			std::endl
 		;
+	}
 }
 
 static int mirror( const CommandLine &cmdLine )
 {
 	doEnterFunction( "mirror( const CommandLine &cmdLine )" );
-
 
 	int			maxAge = 0;
 	std::size_t	maxQueueLen = 0;
@@ -921,7 +964,7 @@ void CollectorThread::scanDirectory( const STRING &dir )
 
 	if( !m_maxQueueLen )
 	{
-		while( !waitForLocker( m_colLock, randomNumber(10000) ) )
+		while( !waitForLocker( getLocker(), randomNumber(10000) ) )
 		{
 			Sleep( randomNumber(1000) );
 		}
@@ -949,13 +992,8 @@ void CollectorThread::scanDirectory( const STRING &dir )
 				m_latestFile = fileEntry.fileName;
 			}
 
-			while( !waitForLocker( m_colLock, randomNumber(10000) ) )
-			{
-				Sleep( randomNumber(1000) );
-			}
 			m_fileQueue.push( fileEntry );
 			m_completeList.addElement( fileEntry );
-			m_colLock.unlock();
 
 			while( m_maxQueueLen && m_fileQueue.size() >= m_maxQueueLen )
 			{
@@ -973,7 +1011,7 @@ void CollectorThread::scanDirectory( const STRING &dir )
 
 	if( !m_maxQueueLen )
 	{
-		m_colLock.unlock();
+		getLocker().unlock();
 	}
 }
 
@@ -997,6 +1035,7 @@ void CollectorThread::ExecuteThread( void )
 void CopyFilterThread::ExecuteThread( void )
 {
 	doEnterFunction("CopyFilterThread::ExecuteThread");
+	bool inputLocked = false;
 
 	bool		addFile;
 	STRING		reason;
@@ -1013,20 +1052,18 @@ void CopyFilterThread::ExecuteThread( void )
 
 	while( m_theSrcCollector->isRunning || inputQueue.size() )
 	{
-		if( inputQueue.size()
-		&& (
-			!m_theSrcCollector->isRunning ||
-			waitForLocker( m_theSrcCollector->getLocker(), randomNumber(10000) )
-		) )
+		if( !m_theSrcCollector->isRunning && !inputLocked )
+		{
+			inputQueue.getLocker().lock();
+			inputLocked = true;
+		}
+		if( inputQueue.wait(randomNumber(1000)) )
 		{
 			addFile = false;
 			reason = (const char *)NULL;
 			DirectoryEntry theSourceEntry = inputQueue.pop();
 			const STRING &theSourceFile = theSourceEntry.fileName;
-			if( m_theSrcCollector->isRunning )
-			{
-				m_theSrcCollector->getLocker().unlock();
-			}
+			inputQueue.unlock();
 
 			STRING theDestFile = getDestFilePath(
 				theSourceFile, source, m_destinationPath
@@ -1112,13 +1149,7 @@ void CopyFilterThread::ExecuteThread( void )
 			{
 				if( addFile )
 				{
-					while( !waitForLocker( m_colLock, randomNumber(10000) ) )
-					{
-						Sleep( randomNumber(1000) );
-					}
-
 					m_fileQueue.push( theSourceEntry );
-					m_colLock.unlock();
 
 					m_count++;
 					while( m_maxQueueLen && m_fileQueue.size() >= m_maxQueueLen )
@@ -1139,8 +1170,6 @@ void CopyFilterThread::ExecuteThread( void )
 #endif
 			}
 		}
-		else
-			Sleep( randomNumber(1000) );
 	}
 }
 
@@ -1148,6 +1177,7 @@ void DeleteFilterThread::ExecuteThread( void )
 {
 	doEnterFunction("DeleteFilterThread::ExecuteThread");
 
+	bool inputLocked = false;
 	DirectoryQueue	&inputQueue = m_theDstCollector->getQueue();
 	const STRING	&destination = m_theDstCollector->getSource();
 	STRING			logEntry;
@@ -1159,17 +1189,15 @@ void DeleteFilterThread::ExecuteThread( void )
 
 	while( m_theDstCollector->isRunning || inputQueue.size() )
 	{
-		if( inputQueue.size()
-		&& (
-			!m_theDstCollector->isRunning ||
-			waitForLocker( m_theDstCollector->getLocker(), randomNumber(10000) )
-		) )
+		if( !m_theDstCollector->isRunning && !inputLocked )
+		{
+			inputQueue.getLocker().lock();
+			inputLocked = true;
+		}
+		if( inputQueue.wait(randomNumber(1000)) )
 		{
 			DirectoryEntry theDestFile = inputQueue.pop();
-			if( m_theDstCollector->isRunning )
-			{
-				m_theDstCollector->getLocker().unlock();
-			}
+			inputQueue.unlock();
 
 			STRING theSourceFile = getDestFilePath(
 				theDestFile.fileName, destination, m_sourcePath
@@ -1186,13 +1214,7 @@ void DeleteFilterThread::ExecuteThread( void )
 				}
 				else
 				{
-					while( !waitForLocker( m_colLock, randomNumber(10000) ) )
-					{
-						Sleep( randomNumber(1000) );
-					}
-
 					m_fileQueue.push( theDestFile );
-					m_colLock.unlock();
 
 					while( m_maxQueueLen && m_fileQueue.size() >= m_maxQueueLen )
 					{
@@ -1201,10 +1223,6 @@ void DeleteFilterThread::ExecuteThread( void )
 				}
 			}
 		}
-		else
-		{
-			Sleep( randomNumber(1000) );
-		}
 	}
 }
 
@@ -1212,6 +1230,7 @@ void CopyThread::ExecuteThread()
 {
 	doEnterFunction("CopyThread::ExecuteThread");
 
+	bool inputLocked = false;
 	STRING			logEntry;
 	DirectoryQueue	&copyQueue = m_filter->getQueue();
 
@@ -1237,11 +1256,12 @@ void CopyThread::ExecuteThread()
 
 	while( m_filter->isRunning || copyQueue.size() )
 	{
-		if( copyQueue.size()
-		&&  (
-			!m_filter->isRunning ||
-			waitForLocker( m_filter->getLocker(), randomNumber(10000) )
-		) )
+		if( !m_filter->isRunning && !inputLocked )
+		{
+			copyQueue.getLocker().lock();
+			inputLocked = true;
+		}
+		if( copyQueue.wait(randomNumber(1000)) )
 		{
 			if( !m_startTick )
 			{
@@ -1249,10 +1269,7 @@ void CopyThread::ExecuteThread()
 			}
 
 			DirectoryEntry	theSourceFile = copyQueue.pop();
-			if( m_filter->isRunning )
-			{
-				m_filter->getLocker().unlock();
-			}
+			copyQueue.unlock();
 
 			STRING theDestFile = getDestFilePath(
 				theSourceFile.fileName, source, destination
@@ -1357,6 +1374,7 @@ void CopyThread::ExecuteThread()
 
 				try
 				{
+					doEnableLog();
 					fcopy( theSourceFile.fileName, theDestFile );
 #ifdef _Windows
 					if( m_archiveMode )
@@ -1391,11 +1409,9 @@ void CopyThread::ExecuteThread()
 
 			m_count++;
 		}
-		else
-		{
-			Sleep( randomNumber(1000) );
-		}
 	}
+	doLogValue(m_filter->isRunning);
+	doLogValue(copyQueue.size());
 	logFile << "Finished copy from " << source << " to " << destination << '\n';
 }
 
@@ -1403,6 +1419,7 @@ void DeleteThread::ExecuteThread()
 {
 	doEnterFunction("DeleteThread::ExecuteThread");
 
+	bool			inputLocked = false;
 	DirectoryQueue	&deleteQueue = m_filter->getQueue();
 	STRING			backupPath = m_maxAge ? m_filter->getBackupPath() : NULL_STRING;
 	const STRING	&destination = m_filter->getDestination();
@@ -1419,17 +1436,15 @@ void DeleteThread::ExecuteThread()
 	m_count = 0;
 	while( m_filter->isRunning || deleteQueue.size() )
 	{
-		if( deleteQueue.size()
-		&&  (
-			!m_filter->isRunning ||
-			waitForLocker( m_filter->getLocker(), randomNumber(10000) )
-		))
+		if( !m_filter->isRunning && !inputLocked )
+		{
+			deleteQueue.getLocker().lock();
+			inputLocked = true;
+		}
+		if( deleteQueue.wait(randomNumber(1000)) )
 		{
 			DirectoryEntry theDestFile = deleteQueue.pop();
-			if( m_filter->isRunning )
-			{
-				m_filter->getLocker().unlock();
-			}
+			deleteQueue.unlock();
 
 			if( isDirectory( theDestFile.fileName ) )
 			{
@@ -1463,8 +1478,6 @@ void DeleteThread::ExecuteThread()
 				m_count++;
 			}
 		}
-		else
-			Sleep( randomNumber(1000) );
 	}
 	while( m_directories.size() )
 	{
@@ -1539,8 +1552,9 @@ void TreeCreator::perform( const STRING &backupPath )
 
 int main( int , const char *argv[] )
 {
-	doIgnoreThreads();
+	//doIgnoreThreads();
 	//doDisableLog();
+	//doEnableLog();
 
 	int result = EXIT_FAILURE;
 
