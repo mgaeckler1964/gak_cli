@@ -796,9 +796,9 @@ static void mirror(
 			;
 			lastCopySize = copySize;
 		}
-		Eta<>::ClockTicks	copyTicks = copyEtaCalculator.getETA();
-		Eta<>::ClockTicks	checkTicks = checkEtaCalculator.getETA();
-		Eta<>::ClockTicks	delTicks = delEtaCalculator.getETA();
+		Eta<>::ClockTicks	copyTicks = copyEtaCalculator.getETA(700,1300);
+		Eta<>::ClockTicks	checkTicks = checkEtaCalculator.getETA(700,1300);
+		Eta<>::ClockTicks	delTicks = delEtaCalculator.getETA(700,1300);
 
 		if( copyTicks > checkTicks &&  copyTicks > delTicks )
 		{
@@ -808,9 +808,13 @@ static void mirror(
 		{
 			std::cout << " ch " << checkEtaCalculator;
 		}
-		else if( delTicks )
+		else if( delTicks && theDeleteConsumer->isRunning )
 		{
 			std::cout << " de " << delEtaCalculator;
+		}
+		else
+		{
+			std::cout << "                         ";
 		}
 		theCopyConsumer->logDiskSpeed();
 		std::cout << " \r" << std::flush;
