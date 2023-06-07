@@ -249,6 +249,7 @@ class CopyFilterThread : public CollectorBase
 	STRING						m_destinationPath;
 	bool						m_archiveMode;
 	bool						m_compareMode;
+	std::size_t					m_checkCount;
 
 	public:
 	CopyFilterThread(
@@ -260,10 +261,11 @@ class CopyFilterThread : public CollectorBase
 	: CollectorBase( maxQueueLen ),
 	m_theSrcCollector(srcCollector),
 	m_theDstCollector(dstCollector),
-	m_destinationPath( dest )
+	m_destinationPath(dest),
+	m_archiveMode(archiveMode),
+	m_compareMode(compareMode),
+	m_checkCount(0)
 	{
-		m_archiveMode = archiveMode;
-		m_compareMode = compareMode;
 		StartThread();
 	}
 	virtual void ExecuteThread( void );
@@ -279,6 +281,10 @@ class CopyFilterThread : public CollectorBase
 	{
 		Thread::joinOtherThread( m_theDstCollector );
 		return m_theDstCollector->getBackupPath();
+	}
+	std::size_t getCheckCount() const
+	{
+		return m_checkCount;
 	}
 };
 
@@ -796,9 +802,9 @@ static void mirror(
 			;
 			lastCopySize = copySize;
 		}
-		Eta<>::ClockTicks	copyTicks = copyEtaCalculator.getETA(700,1300);
-		Eta<>::ClockTicks	checkTicks = checkEtaCalculator.getETA(700,1300);
-		Eta<>::ClockTicks	delTicks = delEtaCalculator.getETA(700,1300);
+		Eta<>::ClockTicks	copyTicks = copyEtaCalculator.getETA(501,1499);
+		Eta<>::ClockTicks	checkTicks = checkEtaCalculator.getETA(501,1499);
+		Eta<>::ClockTicks	delTicks = delEtaCalculator.getETA(501,1499);
 
 		if( copyTicks > checkTicks &&  copyTicks > delTicks )
 		{
@@ -861,7 +867,15 @@ static void mirror(
 
 	if( compareMode )
 	{
+		clock_t checkTime = sw.get<Seconds<>>().asSeconds();;
+		if( !checkTime )
+		{
+			checkTime = 1;
+		}
+
 		std::cout <<
+			"\nChecked    : " << theCopyFilter->getCheckCount() <<
+			"\nPer Sec    : " << theCopyFilter->getCheckCount()/checkTime <<
 			"\nNot Deleted: " << theDeleteFilter->getCount() <<
 			"\nNot Copied : " << theCopyFilter->getCount() <<
 			"\nErrors     : " << theCopyFilter->getErrorCount() <<
@@ -1122,6 +1136,7 @@ void CopyFilterThread::ExecuteThread( void )
 			{
 				if( !addFile && !theSourceEntry.directory )
 				{
+					++m_checkCount;
 					SharedObjectPointer<CheckSumThread> md5Source = new CheckSumThread( theSourceFile );
 					SharedObjectPointer<CheckSumThread> md5Dest = new CheckSumThread( theDestFile );
 
