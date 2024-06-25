@@ -131,7 +131,7 @@ static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *ev
 	secondsLeft = showUnit<SECONDS_PER_HOUR, 2>(secondsLeft);
 	secondsLeft = showUnit<SECONDS_PER_MINUTE, 3>(secondsLeft);
 	secondsLeft = showUnit<1, 4>(secondsLeft);
-	std::cout << " bis zum nächsten " << eventName << std::endl;
+	std::cout << " bis zum n\x84" "chsten " << eventName << std::endl;	// nächsten
 }
 
 // --------------------------------------------------------------------- //
@@ -171,7 +171,7 @@ int main( void )
 	gak::DateTime now;
 	std::cout << "Jetzt ist " << now << ' ' << seasons[now.getSeason()] << std::endl;
 	gak::DateTime	nextSpring = now.nextSpring();
-	showTimeLeft( now, nextSpring, "Frühling" );
+	showTimeLeft( now, nextSpring, "Fr\x81hling" );		// Frühling
 	gak::DateTime	nextSummer = now.nextSummer();
 	showTimeLeft( now, nextSummer, "Sommer" );
 }
