@@ -45,6 +45,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "minMax", "TOOLS\minMax.vcxp
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dupMails", "TOOLS\dupMails.vcxproj", "{7E53013D-8C5F-4C19-9A13-079434667A1C}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "season", "TOOLS\season.vcxproj", "{0ED29EA8-4D7C-4990-A585-54550AE9C925}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -223,6 +225,14 @@ Global
 		{7E53013D-8C5F-4C19-9A13-079434667A1C}.Release|Win32.Build.0 = Release|Win32
 		{7E53013D-8C5F-4C19-9A13-079434667A1C}.Release|x64.ActiveCfg = Release|x64
 		{7E53013D-8C5F-4C19-9A13-079434667A1C}.Release|x64.Build.0 = Release|x64
+		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Debug|Win32.Build.0 = Debug|Win32
+		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Debug|x64.ActiveCfg = Debug|x64
+		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Debug|x64.Build.0 = Debug|x64
+		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Release|Win32.ActiveCfg = Release|Win32
+		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Release|Win32.Build.0 = Release|Win32
+		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Release|x64.ActiveCfg = Release|x64
+		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

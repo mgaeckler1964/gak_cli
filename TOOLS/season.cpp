@@ -1,12 +1,12 @@
 /*
-		Project:		GAK_CLI
-		Module:			minMax.cpp
-		Description:	search for smallest/bigest, newest/oldest files
+		Project:		
+		Module:			
+		Description:	
 		Author:			Martin Gäckler
 		Address:		Hopfengasse 15, A-4020 Linz
 		Web:			https://www.gaeckler.at/
 
-		Copyright:		(c) 1988-2021 Martin Gäckler
+		Copyright:		(c) 1988-2023 Martin Gäckler
 
 		This program is free software: you can redistribute it and/or modify  
 		it under the terms of the GNU General Public License as published by  
@@ -15,7 +15,7 @@
 		You should have received a copy of the GNU General Public License 
 		along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Germany, Munich ``AS IS''
+		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Austria, Linz ``AS IS''
 		AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
 		TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
 		PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR
@@ -40,9 +40,7 @@
 
 #include <iostream>
 
-#include <gak/gaklib.h>
-#include <gak/exception.h>
-#include <gak/directory.h>
+#include <gak/datetime.h>
 
 // --------------------------------------------------------------------- //
 // ----- imported datas ------------------------------------------------ //
@@ -67,29 +65,9 @@
 // ----- macros -------------------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-#undef max
-#undef min
-
 // --------------------------------------------------------------------- //
 // ----- type definitions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
-
-struct MinMaxData
-{
-	gak::F_STRING	m_minSizeName, m_maxSizeName,
-					m_minDateName, m_maxDateName;
-
-	gak::uint64		m_minSize, m_maxSize;
-	time_t			m_minDate, m_maxDate;
-
-	MinMaxData()
-	{
-		m_minSize = std::numeric_limits<gak::uint64>::max();
-		m_maxSize = std::numeric_limits<gak::uint64>::min();
-		m_minDate = std::numeric_limits<time_t>::max();
-		m_maxDate = std::numeric_limits<time_t>::min();
-	}
-};
 
 // --------------------------------------------------------------------- //
 // ----- class definitions --------------------------------------------- //
@@ -103,6 +81,22 @@ struct MinMaxData
 // ----- module static data -------------------------------------------- //
 // --------------------------------------------------------------------- //
 
+static const std::time_t SECONDS_PER_MINUTE = 60;
+static const std::time_t SECONDS_PER_HOUR = SECONDS_PER_MINUTE*60;
+static const std::time_t SECONDS_PER_DAY = SECONDS_PER_HOUR*24;
+static const std::time_t SECONDS_PER_WEEK = SECONDS_PER_DAY*7;
+
+const char *timeUnits[] =
+{
+	" Woche(n) ", " Tag(e) ", " Stunde(n) ", " Minute(n) ", " Sekunde(n) "
+};
+
+const char *seasons[] =
+{
+	"", "Frühling", "Sommer", "Herbst", "Winter"
+};
+
+
 // --------------------------------------------------------------------- //
 // ----- class static data --------------------------------------------- //
 // --------------------------------------------------------------------- //
@@ -115,6 +109,31 @@ struct MinMaxData
 // ----- module functions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
 
+template <std::time_t UNIT_SECCONDS, int UNIT_IDX> 
+std::time_t showUnit( std::time_t secondsLeft )
+{
+	if( secondsLeft >= UNIT_SECCONDS )
+	{
+		std::time_t unit = secondsLeft / UNIT_SECCONDS;
+		secondsLeft -= unit*UNIT_SECCONDS;
+		std::cout << unit << timeUnits[UNIT_IDX];
+	}
+
+	return secondsLeft;
+}
+
+static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *eventName )
+{
+	std::time_t secondsLeft = event.getUtcUnixSeconds() - now.getUtcUnixSeconds();
+
+	secondsLeft = showUnit<SECONDS_PER_WEEK, 0>(secondsLeft);
+	secondsLeft = showUnit<SECONDS_PER_DAY, 1>(secondsLeft);
+	secondsLeft = showUnit<SECONDS_PER_HOUR, 2>(secondsLeft);
+	secondsLeft = showUnit<SECONDS_PER_MINUTE, 3>(secondsLeft);
+	secondsLeft = showUnit<1, 4>(secondsLeft);
+	std::cout << " bis zum nächsten " << eventName << std::endl;
+}
+
 // --------------------------------------------------------------------- //
 // ----- class inlines ------------------------------------------------- //
 // --------------------------------------------------------------------- //
@@ -126,88 +145,6 @@ struct MinMaxData
 // --------------------------------------------------------------------- //
 // ----- class static functions ---------------------------------------- //
 // --------------------------------------------------------------------- //
-
-void minMaxFile( const gak::DirectoryEntry &file, MinMaxData &minMaxData )
-{
-	if( !file.directory )
-	{
-		if( minMaxData.m_minSize > file.fileSize )
-		{
-			minMaxData.m_minSizeName = file.fileName;
-			minMaxData.m_minSize = file.fileSize;
-		}
-		if( minMaxData.m_maxSize < file.fileSize )
-		{
-			minMaxData.m_maxSizeName = file.fileName;
-			minMaxData.m_maxSize = file.fileSize;
-		}
-		if( minMaxData.m_minDate > file.modifiedDate.getUtcUnixSeconds() )
-		{
-			minMaxData.m_minDateName = file.fileName;
-			minMaxData.m_minDate = file.modifiedDate.getUtcUnixSeconds();
-		}
-		if( minMaxData.m_maxDate < file.modifiedDate.getUtcUnixSeconds() )
-		{
-			minMaxData.m_maxDateName = file.fileName;
-			minMaxData.m_maxDate = file.modifiedDate.getUtcUnixSeconds();
-		}
-	}
-}
-
-inline void minMaxFile( const gak::F_STRING &fName, MinMaxData &minMaxData )
-{
-	gak::DirectoryEntry file(fName);
-	minMaxFile( file, minMaxData );
-}
-
-void minMaxDirectory( const gak::F_STRING &directoryName, MinMaxData &minMaxData )
-{
-	gak::DirectoryList	dirList;
-
-	dirList.dirlist( directoryName );
-	for(
-		gak::DirectoryList::iterator it = dirList.begin(), endIT = dirList.end();
-		it != endIT;
-		++it
-	)
-	{
-		if( it->fileName != "." && it->fileName != ".." )
-		{
-			gak::F_STRING	fName = directoryName + DIRECTORY_DELIMITER + it->fileName;
-			it->fileName = fName;
-			minMaxFile( *it, minMaxData );
-			if( gak::isDirectory( fName ) )
-			{
-				minMaxDirectory( fName, minMaxData );
-			}
-		}
-	}
-}
-
-int minMax( const char *argv[] )
-{
-	MinMaxData	minMaxData;
-	while( const char *arg = *++argv )
-	{
-		gak::F_STRING fName = arg;
-		minMaxFile( fName, minMaxData );
-		if( gak::isDirectory( fName ) )
-		{
-			minMaxDirectory( fName, minMaxData );
-		}
-	}
-
-	std::cout << "Oldest Entry:\t" << minMaxData.m_minDateName
-			  << "\n\t\t" << gak::DateTime(minMaxData.m_minDate) 
-			  << "\nNewest Entry:\t" << minMaxData.m_maxDateName
-			  << "\n\t\t" << gak::DateTime(minMaxData.m_maxDate) 
-			  << "\nSmallest Entry:\t" << minMaxData.m_minSizeName
-			  << "\n\t\t" << minMaxData.m_minSize
-			  << "\nBiggest Entry:\t" << minMaxData.m_maxSizeName
-			  << "\n\t\t" << minMaxData.m_maxSize << std::endl;
-			  
-	return EXIT_SUCCESS;
-}
 
 // --------------------------------------------------------------------- //
 // ----- class privates ------------------------------------------------ //
@@ -229,24 +166,14 @@ int minMax( const char *argv[] )
 // ----- entry points -------------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-int main( int /*argc*/, const char *argv[] )
+int main( void )
 {
-	int result = EXIT_FAILURE;
-
-	try
-	{
-		result = minMax( argv );
-	}
-	catch( std::exception &e )
-	{
-		std::cerr << argv[0] << ": " << e.what() << std::endl;
-	}
-	catch( ... )
-	{
-		std::cerr << argv[0] << ": Unkown error" << std::endl;
-	}
-
-	return result;
+	gak::DateTime now;
+	std::cout << "Jetzt ist " << now << ' ' << seasons[now.getSeason()] << std::endl;
+	gak::DateTime	nextSpring = now.nextSpring();
+	showTimeLeft( now, nextSpring, "Frühling" );
+	gak::DateTime	nextSummer = now.nextSummer();
+	showTimeLeft( now, nextSummer, "Sommer" );
 }
 
 #ifdef __BORLANDC__

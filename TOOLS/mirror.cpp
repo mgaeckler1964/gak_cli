@@ -1120,8 +1120,8 @@ void CopyFilterThread::ExecuteThread( void )
 				if( addFile
 				|| theSourceEntry.fileSize != theDestEntry.fileSize
 				|| abs(
-					theSourceEntry.modifiedDate.getUnixSeconds() -
-					theDestEntry.modifiedDate.getUnixSeconds()
+					theSourceEntry.modifiedDate.getUtcUnixSeconds() -
+					theDestEntry.modifiedDate.getUtcUnixSeconds()
 				) >2 )
 				{
 					addFile = true;
