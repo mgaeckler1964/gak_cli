@@ -174,6 +174,12 @@ int main( void )
 	showTimeLeft( now, nextSpring, "Fr\x81hling" );		// Frühling
 	gak::DateTime	nextSummer = now.nextSummer();
 	showTimeLeft( now, nextSummer, "Sommer" );
+
+	gak::DateTime	nextFullMoon = now.nextFullMoon();
+	showTimeLeft( now, nextFullMoon, "Vollmond" );
+
+	gak::DateTime	nextNewMoon = now.nextNewMoon();
+	showTimeLeft( now, nextNewMoon, "Newmond" );
 }
 
 #ifdef __BORLANDC__
