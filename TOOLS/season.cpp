@@ -86,9 +86,14 @@ static const std::time_t SECONDS_PER_HOUR = SECONDS_PER_MINUTE*60;
 static const std::time_t SECONDS_PER_DAY = SECONDS_PER_HOUR*24;
 static const std::time_t SECONDS_PER_WEEK = SECONDS_PER_DAY*7;
 
-const char *timeUnits[] =
+const char *ptimeUnits[] =
 {
-	" Woche(n) ", " Tag(e) ", " Stunde(n) ", " Minute(n) ", " Sekunde(n) "
+	" Wochen ", " Tage ", " Stunden ", " Minuten ", " Sekunden "
+};
+
+const char *stimeUnits[] =
+{
+	" Woche ", " Tag ", " Stunde ", " Minute ", " Sekunde "
 };
 
 const char *seasons[] =
@@ -116,7 +121,7 @@ std::time_t showUnit( std::time_t secondsLeft )
 	{
 		std::time_t unit = secondsLeft / UNIT_SECCONDS;
 		secondsLeft -= unit*UNIT_SECCONDS;
-		std::cout << unit << timeUnits[UNIT_IDX];
+		std::cout << unit << (unit==1?stimeUnits:ptimeUnits)[UNIT_IDX];
 	}
 
 	return secondsLeft;
@@ -131,7 +136,7 @@ static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *ev
 	secondsLeft = showUnit<SECONDS_PER_HOUR, 2>(secondsLeft);
 	secondsLeft = showUnit<SECONDS_PER_MINUTE, 3>(secondsLeft);
 	secondsLeft = showUnit<1, 4>(secondsLeft);
-	std::cout << " bis zum n\x84" "chsten " << eventName << std::endl;	// nächsten
+	std::cout << "bis zum n\x84" "chsten " << eventName << std::endl;	// nächsten
 }
 
 // --------------------------------------------------------------------- //
@@ -179,7 +184,7 @@ int main( void )
 	showTimeLeft( now, nextFullMoon, "Vollmond" );
 
 	gak::DateTime	nextNewMoon = now.nextNewMoon();
-	showTimeLeft( now, nextNewMoon, "Newmond" );
+	showTimeLeft( now, nextNewMoon, "Neumond" );
 }
 
 #ifdef __BORLANDC__
