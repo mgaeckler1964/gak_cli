@@ -174,7 +174,7 @@ static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *ev
 int main( void )
 {
 	gak::DateTime now;
-	std::cout << "Jetzt ist " << now << ' ' << seasons[now.getSeason()] << std::endl;
+	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now << ' ' << seasons[now.getSeason()] << std::endl;
 	gak::DateTime	nextSpring = now.nextSpring();
 	showTimeLeft( now, nextSpring, "Fr\x81hling" );		// Frühling
 	gak::DateTime	nextSummer = now.nextSummer();
