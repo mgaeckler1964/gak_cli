@@ -3,10 +3,10 @@
 		Module:			
 		Description:	
 		Author:			Martin Gäckler
-		Address:		Hopfengasse 15, A-4020 Linz
+		Address:		HoFmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/
 
-		Copyright:		(c) 1988-2023 Martin Gäckler
+		Copyright:		(c) 1988-2024 Martin Gäckler
 
 		This program is free software: you can redistribute it and/or modify  
 		it under the terms of the GNU General Public License as published by  
@@ -15,7 +15,7 @@
 		You should have received a copy of the GNU General Public License 
 		along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Austria, Linz ``AS IS''
+		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Linz, Austria ``AS IS''
 		AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
 		TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
 		PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR
@@ -98,7 +98,7 @@ const char *stimeUnits[] =
 
 const char *seasons[] =
 {
-	"", "Frühling", "Sommer", "Herbst", "Winter"
+	"", "Fr\x81hling", "Sommer", "Herbst", "Winter"
 };
 
 
@@ -175,16 +175,40 @@ int main( void )
 {
 	gak::DateTime now;
 	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now << ' ' << seasons[now.getSeason()] << std::endl;
+
 	gak::DateTime	nextSpring = now.nextSpring();
-	showTimeLeft( now, nextSpring, "Fr\x81hling" );		// Frühling
 	gak::DateTime	nextSummer = now.nextSummer();
-	showTimeLeft( now, nextSummer, "Sommer" );
+	if (nextSpring < nextSummer )
+	{
+		showTimeLeft( now, nextSpring, "Fr\x81hling" );		// Frühling
+		showTimeLeft( now, nextSummer, "Sommer" );
+	}
+	else
+	{
+		showTimeLeft( now, nextSummer, "Sommer" );
+		showTimeLeft( now, nextSpring, "Fr\x81hling" );		// Frühling
+	}
 
 	gak::DateTime	nextFullMoon = now.nextFullMoon();
-	showTimeLeft( now, nextFullMoon, "Vollmond" );
-
 	gak::DateTime	nextNewMoon = now.nextNewMoon();
-	showTimeLeft( now, nextNewMoon, "Neumond" );
+	std::time_t	moonLevelTime;
+	if (nextFullMoon < nextNewMoon )
+	{
+		showTimeLeft( now, nextFullMoon, "Vollmond" );
+		showTimeLeft( now, nextNewMoon, "Neumond" );
+
+		moonLevelTime = gak::AVG_MOON_PHASE2 - (nextFullMoon.getUtcUnixSeconds() - now.getUtcUnixSeconds());
+	}
+	else
+	{
+		showTimeLeft( now, nextNewMoon, "Neumond" );
+		showTimeLeft( now, nextFullMoon, "Vollmond" );
+
+		moonLevelTime = nextNewMoon.getUtcUnixSeconds() - now.getUtcUnixSeconds();
+	}
+	int moonPercent = moonLevelTime*100.0/(gak::AVG_MOON_PHASE) +0.5;
+	std::cout << moonPercent << "% Mondphase" << std::endl;
+
 }
 
 #ifdef __BORLANDC__
