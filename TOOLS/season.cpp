@@ -206,7 +206,7 @@ int main( void )
 
 		moonLevelTime = nextNewMoon.getUtcUnixSeconds() - now.getUtcUnixSeconds();
 	}
-	int moonPercent = moonLevelTime*100.0/(gak::AVG_MOON_PHASE) +0.5;
+	int moonPercent = moonLevelTime*100.0/(gak::AVG_MOON_PHASE2) +0.5;
 	std::cout << moonPercent << "% Mondphase" << std::endl;
 
 }
