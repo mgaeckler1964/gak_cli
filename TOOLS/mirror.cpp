@@ -190,16 +190,17 @@ class CollectorBase : public Thread
 class CollectorThread : public CollectorBase
 {
 	F_STRING		m_sourcePath,
+					m_excludes,
 					m_backupPath;
 	DirectoryList	m_completeList;
 	DateTime	  	m_latestDate;
 	F_STRING		m_latestFile;
 
-	void scanDirectory( const STRING &dir );
+	void scanDirectory( const STRING &dir, const F_STRING &excludes );
 
 	public:
-	CollectorThread( const STRING &sourcePath, std::size_t maxQueueLen )
-	: CollectorBase( maxQueueLen ), m_sourcePath( sourcePath ), m_latestDate( time_t(0) )
+	CollectorThread( const STRING &sourcePath, const STRING &excludes, std::size_t maxQueueLen )
+	: CollectorBase( maxQueueLen ), m_sourcePath( sourcePath ), m_excludes(excludes), m_latestDate( time_t(0) )
 	{
 		doEnterFunction("CollectorThread::CollectorThread");
 		StartThread();
@@ -693,10 +694,10 @@ static void mirror(
 
 
 	SharedObjectPointer<CollectorThread>	theSourceCollector = new CollectorThread(
-		source, maxQueueLen
+		source, ".mirrorExcludes", maxQueueLen
 	);
 	SharedObjectPointer<CollectorThread>	theDestCollector = new CollectorThread(
-		destination, maxQueueLen
+		destination, NULL, maxQueueLen
 	);
 
 
@@ -965,10 +966,11 @@ static int mirror( const CommandLine &cmdLine )
 // ----- class privates ------------------------------------------------ //
 // --------------------------------------------------------------------- //
 
-void CollectorThread::scanDirectory( const STRING &dir )
+void CollectorThread::scanDirectory( const STRING &dir, const F_STRING &excludes )
 {
 	doEnterFunction("CollectorThread::scanDirectory");
 
+	ArrayOfStrings	excludeList;
 	DirectoryList	dirList;
 
 	try
@@ -987,6 +989,15 @@ void CollectorThread::scanDirectory( const STRING &dir )
 			Sleep( randomNumber(1000) );
 		}
 	}
+	if( excludes.strlen() )
+	{
+		STRING excludesPath = dir + DIRECTORY_DELIMITER + excludes;
+		excludeList.readFromFile(excludesPath);
+		if( excludeList.size() )
+		{
+			logStrings.push( "Read " + formatNumber( excludeList.size() ) + " exclusions for " + dir );
+		}
+	}
 
 	for( 
 		DirectoryList::iterator it = dirList.begin(), endIT = dirList.end();
@@ -997,8 +1008,9 @@ void CollectorThread::scanDirectory( const STRING &dir )
 		DirectoryEntry	fileEntry	= *it;
 		const STRING	&file		= fileEntry.fileName;
 
-		if( file != "." && file != ".." )
+		if( file != "." && file != ".." && (excludeList.size()  == 0 || excludeList.findElement(file) == excludeList.no_index))
 		{
+
 			STRING	newDir = dir;
 			newDir += DIRECTORY_DELIMITER;
 			newDir += file;
@@ -1022,7 +1034,7 @@ void CollectorThread::scanDirectory( const STRING &dir )
 
 			if( fileEntry.directory )
 			{
-				scanDirectory( newDir );
+				scanDirectory( newDir, excludes );
 			}
 		}
 	}
@@ -1046,7 +1058,7 @@ void CollectorThread::ExecuteThread( void )
 	doEnterFunction("CollectorThread::ExecuteThread");
 
 	m_count = 0;
-	scanDirectory( m_sourcePath );
+	scanDirectory( m_sourcePath, m_excludes );
 }
 
 
