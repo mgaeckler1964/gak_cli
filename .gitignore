@@ -36,6 +36,7 @@
 *.user
 *.ipch
 *.sdf
+*.suo
 
 alt.txt
 neu.txt
