@@ -74,6 +74,7 @@ static const int HASH_FILE		= 0x040;
 static const int EXECUTABLES	= 0x080;
 
 static const uint32 magic = ('h'<<24) | ('a'<<16) | ('s'<<8) | 'h';
+static const uint16 version = 2;
 
 // --------------------------------------------------------------------- //
 // ----- macros -------------------------------------------------------- //
@@ -288,7 +289,7 @@ static int hash( const CommandLine &cmdLine )
 
 	if( !hashFile.isEmpty() && isFile( hashFile ) )
 	{
-		readFromFile( hashFile, &allDigests, magic );
+		readFromBinaryFile( hashFile, &allDigests, magic, version, false );
 	}
 
 	while( (arg = *argv++) != NULL )
@@ -312,7 +313,7 @@ static int hash( const CommandLine &cmdLine )
 
 	if( !hashFile.isEmpty() && allDigests.size() )
 	{
-		writeToFile( hashFile, allDigests, magic );
+		writeToBinaryFile( hashFile, allDigests, magic, version, owmOverwrite );
 	}
 
 	return EXIT_SUCCESS;

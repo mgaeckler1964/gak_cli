@@ -267,7 +267,7 @@ static int cpp( const CommandLine &cmdLine )
 	F_STRING	crossRefDB = cmdLine.flags & OPT_CROSS_REF_DB ? cmdLine.parameter['C'][0] : STRING();
 	if( !crossRefDB.isEmpty() && isFile( crossRefDB ) )
 	{
-		readFromFile( crossRefDB, &crossReference, magic );
+		readFromBinaryFile( crossRefDB, &crossReference, magic, 1, false );
 	}
 
 	while( (arg = *argv++) != NULL )
@@ -342,7 +342,7 @@ static int cpp( const CommandLine &cmdLine )
 
 	if( !crossRefDB.isEmpty() && crossReference.size() )
 	{
-		writeToFile( crossRefDB, crossReference, magic );
+		writeToBinaryFile( crossRefDB, crossReference, magic, 1, owmOverwrite );
 	}
 
 	if( filesSpecified && !count )
