@@ -174,7 +174,8 @@ static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *ev
 int main( void )
 {
 	gak::DateTime now;
-	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now << ' ' << seasons[now.getSeason()] << std::endl;
+	gak::DateTime::Season	season = now.getSeason();
+	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now << ' ' << seasons[season] << std::endl;
 
 	gak::DateTime	nextSpring = now.nextSpring();
 	gak::DateTime	nextSummer = now.nextSummer();
@@ -187,6 +188,15 @@ int main( void )
 	{
 		showTimeLeft( now, nextSummer, "Sommer" );
 		showTimeLeft( now, nextSpring, "Fr\x81hling" );		// Frühling
+	}
+
+	if( season == gak::DateTime::S_SUMMER )
+	{
+		showTimeLeft( now, now.nextAutumn(), "Herbst" );
+	}
+	else if( season == gak::DateTime::S_AUTUMN )
+	{
+		showTimeLeft( now, now.nextWinter(), "Winter" );
 	}
 
 	gak::DateTime	nextFullMoon = now.nextFullMoon();
