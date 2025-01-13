@@ -251,9 +251,6 @@ static void dupMails( const gak::CommandLine &cmdLine )
 
 int main( int , const char *argv[] )
 {
-	//doIgnoreThreads();
-	//doDisableLog();
-
 	int result = EXIT_FAILURE;
 
 	try

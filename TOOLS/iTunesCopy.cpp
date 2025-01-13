@@ -495,7 +495,7 @@ static void copySongs( void )
 
 int main( int argc, const char *argv[] )
 {
-	doDisableLog();
+	doEnableLogEx(gakLogging::llInfo);
 #ifdef NDEBUG
 	if( argc != 4 )
 	{
@@ -548,7 +548,6 @@ int main( int argc, const char *argv[] )
 	std::cout << "Reading play list\n";
 	readPlayList( theXmlTemplate, list );
 
-	doEnableLog();
 	std::cout << "Purging files\n";
 	cleanPlayer( destPath );
 

@@ -552,8 +552,8 @@ static void readSongList(
 
 int main( int argc, const char *argv[] )
 {
-//	doDisableLog();
-	doEnterFunction("main");
+	doEnableLogEx(gakLogging::llInfo)
+	doEnterFunctionEx( gakLogging::llInfo, "main");
 
 	Set<STRING>		knownGenres, missingGenres;
 	Set<STRING>		knownArtists, missingArtists;
@@ -567,8 +567,6 @@ int main( int argc, const char *argv[] )
 	}
 	STRING		library1 = argv[1];
 	STRING		library2 = argv[2];
-
-	doDisableLog();
 
 	xml::Parser	theParser1( library1 );
 	xml::Parser	theParser2( library2 );

@@ -1405,7 +1405,6 @@ void CopyThread::ExecuteThread()
 
 				try
 				{
-					doEnableLog();
 					fcopy( theSourceFile.fileName, theDestFile );
 #ifdef _Windows
 					if( m_archiveMode )
@@ -1583,9 +1582,7 @@ void TreeCreator::perform( const STRING &backupPath )
 
 int main( int , const char *argv[] )
 {
-	//doIgnoreThreads();
-	//doDisableLog();
-	//doEnableLog();
+	doEnableLogEx(gakLogging::llInfo);
 
 	int result = EXIT_FAILURE;
 

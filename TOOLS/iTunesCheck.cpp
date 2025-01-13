@@ -373,7 +373,7 @@ int main( int argc, const char *argv[] )
 	}
 	STRING		library = argv[1];
 
-	doDisableLog();
+	doEnableLogEx(gakLogging::llInfo);
 
 	xml::Parser	theParser( library );
 
@@ -383,8 +383,6 @@ int main( int argc, const char *argv[] )
 		std::cerr << "Invalid iTunes Library\n";
 		exit( -1 );
 	}
-
-	doEnableLog();
 
 	readSongList( theXmlTemplate );
 
