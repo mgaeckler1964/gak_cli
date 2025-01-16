@@ -89,7 +89,6 @@ int main( int argc, const char *argv[] )
 	HKEY	theKey;
 	cBool	success = false;
 	cBool	found = false;
-//	char	buffer[10240];
 	int		i;
 
 	if( argc < 2 )
@@ -103,7 +102,6 @@ int main( int argc, const char *argv[] )
 		if( !access( argv[i], 0 ) )
 		{
 			found = true;
-//			fullpath( buffer, argv[i] );
 
 			printf( "Found %s\n", argv[i] );
 
@@ -120,14 +118,20 @@ int main( int argc, const char *argv[] )
 					REG_SZ,
 					(LPBYTE)argv[i], (DWORD)(strlen(argv[i]))
 				) == ERROR_SUCCESS )
+				{
 					success = true;
+				}
 				else
+				{
 					puts( "Cannot update registry" );
+				}
 
 				RegCloseKey( theKey );
 			}
 			else
+			{
 				puts( "Cannot open registry" );
+			}
 
 			break;
 
@@ -135,8 +139,89 @@ int main( int argc, const char *argv[] )
 	}
 
 	if( !found )
+	{
 		puts( "No configurations available -> nothing changed" );
+	}
+	{
+		/*
+			BDE Error workarround
+		*/
+		DWORD	sectorsPerCluster = 0;
+		DWORD	bytesPerSector = 0;
+		DWORD	numberOfFreeClusters = 0;
+		DWORD	totalNumberOfClusters = 0;
+		INT64	freeDiskSize;
+		long	bdeFree;
 
+		GetDiskFreeSpaceA("C:\\",
+			&sectorsPerCluster,
+			&bytesPerSector,
+			&numberOfFreeClusters,
+			&totalNumberOfClusters
+		);
+
+		printf( "sectorsPerCluster %ld\n"
+			"sytesPerSectors %ld\n"
+			"numberOfFreeClusters %ld\n"
+			"totalNumberOfCluster %ld\n",
+			sectorsPerCluster,
+			bytesPerSector,
+			numberOfFreeClusters,
+			totalNumberOfClusters
+		);
+
+		freeDiskSize = (INT64)sectorsPerCluster *  (INT64)bytesPerSector * (INT64)numberOfFreeClusters;
+		freeDiskSize /= (INT64)1024 * (INT64)1024;
+		bdeFree = (long)(freeDiskSize%(4*1024));
+
+		printf( "Real free: %ld MB\nStupid BDE free: %ld MB\n", (long)freeDiskSize, bdeFree );
+		if( bdeFree < 512 )
+		{
+			long safety = (long)((freeDiskSize + 32)*1024*1024);
+			void *bdeWasteBuffer = malloc(safety);
+			if( bdeWasteBuffer )
+			{
+				char tmpfile[1024];
+				char path[1024];
+				char	*tmp = getenv("TMP");
+				if( tmp )
+				{
+					tmpnam(tmpfile);
+					sprintf( path, "%s%s", tmp, tmpfile );
+					{
+						FILE *fp = fopen(path, "wb" );
+						printf("create file %s %ld\n", path, safety);
+						if( fp )
+						{
+							int count = fwrite(bdeWasteBuffer, 1, safety, fp );
+							if( count != safety )
+							{
+								puts("Cannot write");
+								success = false;
+							}
+							fclose( fp );
+						}
+						else
+						{
+							printf("Cannot create file %s\n", path);
+							success = false;
+						}
+					}
+				}
+				else
+				{
+					puts("Cannot find tmp");
+					success = false;
+				}
+				free( bdeWasteBuffer );
+			}
+			else
+			{
+				puts("Cannot allocate file buffer");
+				success = false;
+			}
+		}
+	}
 	return success ? 0 : -1;
 }
 
