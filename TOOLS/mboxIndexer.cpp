@@ -1,7 +1,7 @@
 /*
 		Project:		GAK_CLI
-		Module:			dupMails.cpp
-		Description:	search for duplicate mails in mbox files
+		Module:			mboxIndexer.cpp
+		Description:	index mbox files for AI and search
 		Author:			Martin Gäckler
 		Address:		Hofmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/
@@ -34,17 +34,14 @@
 // ----- switches ------------------------------------------------------ //
 // --------------------------------------------------------------------- //
 
-#include <gak/dirScanner.h>
-#include <gak/mboxParser.h>
-#include <gak/md5.h>
-#include <gak/map.h>
-#include <gak/cmdlineParser.h>
-
 // --------------------------------------------------------------------- //
 // ----- includes ------------------------------------------------------ //
 // --------------------------------------------------------------------- //
 
-#include <iostream>
+#include <gak/dirScanner.h>
+#include <gak/cmdlineParser.h>
+#include <gak/mboxParser.h>
+#include <gak/indexer.h>
 
 // --------------------------------------------------------------------- //
 // ----- imported datas ------------------------------------------------ //
@@ -61,52 +58,61 @@
 #	pragma option -pc
 #endif
 
+using namespace gak;
+using gak::mail::Mails;
+
 // --------------------------------------------------------------------- //
 // ----- constants ----------------------------------------------------- //
 // --------------------------------------------------------------------- //
+
+const int FLAG_USE_META		= 0x10;
+const int FLAG_STOP_WORDS	= 0x20;
+
+const uint32 INDEX_MAGIC	= 0x19901993;
+const uint16 INDEX_VERSION	= 0x1;
 
 // --------------------------------------------------------------------- //
 // ----- macros -------------------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-const int FLAG_CROSS_TREE	= 0x10;
-const int FLAG_USE_META		= 0x20;
-
-static gak::CommandLine::Options options[] =
-{
-	{ 'X', "tree",	0, 1, FLAG_CROSS_TREE, "Find duplicate mails over mbox folder" },
-	{ 'M', "meta",	0, 1, FLAG_USE_META, "include meta data in hash calculation" },
-	{ 0 }
-};
-
 // --------------------------------------------------------------------- //
 // ----- type definitions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-using gak::mail::Mails;
-
-struct MD5
+struct MailAddress
 {
-	unsigned char output[16];
-	int compare( const MD5 &other ) const
+	// STRING		mboxFile;
+	size_t		mailIndex;
+
+	MailAddress() : mailIndex(0) {}
+
+	int compare( const MailAddress &other ) const
 	{
-		return memcmp(output, other.output, 16);
+		return gak::compare( mailIndex, other.mailIndex );
 	}
 };
-typedef gak::PairMap<MD5,Mails>	MapMails;
+
+typedef gak::Index<size_t>			MailIndex;
+typedef MailIndex::RelevantHits		MailSearchResult;
 
 // --------------------------------------------------------------------- //
 // ----- class definitions --------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-class DupMailProcessor : public gak::FileProcessor
+class MailIndexer : public gak::FileProcessor
 {
 public:
-	MapMails				m_theMap;
-	size_t					m_mailCount;
+	size_t				m_mailCount;
+	gak::ArrayOfStrings	m_stopWords;
 
-	DupMailProcessor(const gak::CommandLine	&cmdLine)  : gak::FileProcessor(cmdLine), m_mailCount(0)
+	MailIndexer(const gak::CommandLine	&cmdLine)  : gak::FileProcessor(cmdLine), m_mailCount(0)
 	{
+		if( cmdLine.flags && FLAG_STOP_WORDS )
+		{
+			STRING stopWordsFile = cmdLine.parameter['S'][0];
+			std::cout << "Reading " << stopWordsFile << '\n';
+			m_stopWords.readFromFile(stopWordsFile);
+		}
 	}
 	void start( const gak::STRING &path )
 	{
@@ -114,11 +120,15 @@ public:
 	}
 	void process( const gak::STRING &file )
 	{
-		Mails	theMails;
+		STRING				indexFile = file + ".mboxIdx";
+		size_t				idx=0;
+		MailIndex			mboxIndex;
+		gak::mail::Mails	theMails;
 		std::cout << "process: " << file << std::endl;
 
 		gak::mail::loadMboxFile( file, theMails );
 		m_mailCount += theMails.size();
+		std::cout << "read " << theMails.size() << "Mails" << std::endl;
 
 		for( 
 			Mails::iterator it = theMails.begin(), endIT = theMails.end();
@@ -126,77 +136,40 @@ public:
 			++it
 		)
 		{
-			MD5	hash;
-			gak::STRING &text = it->body;
+			const gak::mail::MAIL &theMail = *it;
+			STRING text = theMail.extractPlainText();
+
+			std::cout << idx << "S\r";
 
 			if( m_cmdLine.flags & FLAG_USE_META )
 			{
+				std::cout << idx << "M\r";
 				text += it->from;
 				text += it->to;
 				text += it->subject;
 				text += it->date.getOriginalTime();
+				std::cout << it->subject << "\n";
 			}
 
-			md5( (unsigned char *)((const char *)text), int(text.strlen()), hash.output );
+			std::cout << idx << "I\r";
+			gak::StringIndex index = gak::indexString(text, m_stopWords);
+			std::cout << idx << "m\r";
+			mboxIndex.mergeIndexPositions( idx, index );
+
+			idx++;
 			text = "";
-			m_theMap[hash].addElement(*it);
+//			std::cout << idx << '\r';
 		}
 
-			if(!(m_cmdLine.flags & FLAG_CROSS_TREE) )
-			{
-				showResult();
-			}
 
-		std::cout << "found: " << theMails.size() << '/' 
-				<< m_theMap.size() << '/' << m_mailCount << std::endl;
+		writeToBinaryFile( indexFile, mboxIndex, INDEX_MAGIC, INDEX_VERSION, ovmShortDown );
+		std::cout << "found: " << theMails.size() << '/' << m_mailCount << std::endl;
 	}
 	void end( const gak::STRING &path )
 	{
 		std::cout << "end: " << path << std::endl;
 	}
-
-
-	void showResult()
-	{
-		for( 
-			MapMails::const_iterator it = m_theMap.cbegin(), 
-			endIT = m_theMap.cend();
-			it != endIT;
-			++it
-		)
-		{
-			const Mails &theMails = it->getValue();
-			if(theMails.size() >1)
-			{
-				std::cout << "DUP found:\n";
-				for(
-					Mails::const_iterator it = theMails.cbegin(), endIT = theMails.cend();
-					it != endIT;
-					++it
-				)
-				{
-					std::cout << it->mboxFile << ": " << it->date << "; " << it->from << "; " << it->subject << std::endl;
-				}
-			}
-		}
-		m_theMap.clear();
-	}
 };
-
-static void dupMails( const gak::CommandLine &cmdLine )
-{
-	gak::DirectoryScanner<DupMailProcessor> theScanner(cmdLine);
-
-	for( int i=1; i<cmdLine.argc; ++i )
-	{
-		theScanner(cmdLine.argv[i]);
-	}
-	if( cmdLine.flags & FLAG_CROSS_TREE )
-	{
-		theScanner.processor().showResult();
-	}
-
-}
 
 // --------------------------------------------------------------------- //
 // ----- exported datas ------------------------------------------------ //
@@ -205,6 +178,13 @@ static void dupMails( const gak::CommandLine &cmdLine )
 // --------------------------------------------------------------------- //
 // ----- module static data -------------------------------------------- //
 // --------------------------------------------------------------------- //
+
+static gak::CommandLine::Options options[] =
+{
+	{ 'M', "meta",	0, 1, FLAG_USE_META, "include meta data in index calculation" },
+	{ 'S', "stopWords",	0, 1, FLAG_STOP_WORDS|gak::CommandLine::needArg, "file with stop words" },
+	{ 0 }
+};
 
 // --------------------------------------------------------------------- //
 // ----- class static data --------------------------------------------- //
@@ -217,6 +197,20 @@ static void dupMails( const gak::CommandLine &cmdLine )
 // --------------------------------------------------------------------- //
 // ----- module functions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
+
+static int mboxIndexer( const gak::CommandLine &cmdLine )
+{
+	int result = EXIT_FAILURE;
+
+	gak::DirectoryScanner<MailIndexer> theScanner(cmdLine);
+
+	for( int i=1; i<cmdLine.argc; ++i )
+	{
+		theScanner(cmdLine.argv[i]);
+	}
+
+	return result;
+}
 
 // --------------------------------------------------------------------- //
 // ----- class inlines ------------------------------------------------- //
@@ -257,13 +251,12 @@ int main( int , const char *argv[] )
 	try
 	{
 		gak::CommandLine cmdLine( options, argv );
-		dupMails( cmdLine );
-		result = EXIT_SUCCESS;
+		result = mboxIndexer( cmdLine );
 	}
-	catch( gak::CmdlineError &e )
+	catch( CmdlineError &e )
 	{
 		std::cerr << argv[0] << ": " << e.what() << std::endl;
-		std::cerr << "Usage: " << argv[0] << " <options>... {<Source Path>|<mbox file>} ...\n" << options;
+		std::cerr << "Usage: " << argv[0] << " <options> <mboxfile> ...\n" << options;
 	}
 	catch( std::exception &e )
 	{

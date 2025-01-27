@@ -47,6 +47,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dupMails", "TOOLS\dupMails.
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "season", "TOOLS\season.vcxproj", "{0ED29EA8-4D7C-4990-A585-54550AE9C925}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mboxIndexer", "TOOLS\mboxIndexer.vcxproj", "{86D70153-A734-4F77-8A09-D25A0FE1BD45}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -233,6 +235,14 @@ Global
 		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Release|Win32.Build.0 = Release|Win32
 		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Release|x64.ActiveCfg = Release|x64
 		{0ED29EA8-4D7C-4990-A585-54550AE9C925}.Release|x64.Build.0 = Release|x64
+		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Debug|Win32.ActiveCfg = Debug|Win32
+		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Debug|Win32.Build.0 = Debug|Win32
+		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Debug|x64.ActiveCfg = Debug|x64
+		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Debug|x64.Build.0 = Debug|x64
+		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Release|Win32.ActiveCfg = Release|Win32
+		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Release|Win32.Build.0 = Release|Win32
+		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Release|x64.ActiveCfg = Release|x64
+		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
