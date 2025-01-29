@@ -67,6 +67,8 @@ using gak::mail::Mails;
 
 const int FLAG_USE_META		= 0x10;
 const int FLAG_STOP_WORDS	= 0x20;
+const int FLAG_INDEX_PATH	= 0x40;
+const int FLAG_BRAIN_PATH	= 0x80;
 
 const uint32 INDEX_MAGIC	= 0x19901993;
 const uint16 INDEX_VERSION	= 0x1;
@@ -104,27 +106,51 @@ class MailIndexer : public gak::FileProcessor
 public:
 	size_t				m_mailCount;
 	gak::ArrayOfStrings	m_stopWords;
+	STRING				m_path;
+	STRING				m_indexPath;
 
 	MailIndexer(const gak::CommandLine	&cmdLine)  : gak::FileProcessor(cmdLine), m_mailCount(0)
 	{
-		if( cmdLine.flags && FLAG_STOP_WORDS )
+		if( cmdLine.flags & FLAG_STOP_WORDS )
 		{
 			STRING stopWordsFile = cmdLine.parameter['S'][0];
 			std::cout << "Reading " << stopWordsFile << '\n';
 			m_stopWords.readFromFile(stopWordsFile);
 		}
+		m_indexPath = cmdLine.parameter['I'][0];
+		if( !m_indexPath.endsWith(DIRECTORY_DELIMITER) )
+		{
+			m_indexPath += DIRECTORY_DELIMITER;
+		}
 	}
 	void start( const gak::STRING &path )
 	{
 		std::cout << "start: " << path << std::endl;
+		m_path = path;
+		if( !m_path.endsWith(DIRECTORY_DELIMITER) )
+		{
+			m_path += DIRECTORY_DELIMITER;
+		}
 	}
 	void process( const gak::STRING &file )
 	{
-		STRING				indexFile = file + ".mboxIdx";
+		F_STRING			theName;
+		STRING				indexFile;
 		size_t				idx=0;
 		MailIndex			mboxIndex;
 		gak::mail::Mails	theMails;
 		std::cout << "process: " << file << std::endl;
+
+		indexFile = m_indexPath;
+		if( !m_path.isEmpty() )
+		{
+			theName = file.subString( m_path.strlen() );
+		}
+		else
+		{
+			fsplit( file, NULL, &theName );
+		}
+		indexFile += theName + ".mboxIdx";
 
 		gak::mail::loadMboxFile( file, theMails );
 		m_mailCount += theMails.size();
@@ -138,36 +164,32 @@ public:
 		{
 			const gak::mail::MAIL &theMail = *it;
 			STRING text = theMail.extractPlainText();
-
-			std::cout << idx << "S\r";
-
-			if( m_cmdLine.flags & FLAG_USE_META )
+			if( !text.isEmpty() )
 			{
-				std::cout << idx << "M\r";
-				text += it->from;
-				text += it->to;
-				text += it->subject;
-				text += it->date.getOriginalTime();
-				std::cout << it->subject << "\n";
+				if( m_cmdLine.flags & FLAG_USE_META )
+				{
+					text += it->from;
+					text += it->to;
+					text += it->subject;
+					text += it->date.getOriginalTime();
+				}
+
+				gak::StringIndex index = gak::indexString(text, m_stopWords);
+				mboxIndex.mergeIndexPositions( idx, index );
 			}
-
-			std::cout << idx << "I\r";
-			gak::StringIndex index = gak::indexString(text, m_stopWords);
-			std::cout << idx << "m\r";
-			mboxIndex.mergeIndexPositions( idx, index );
-
 			idx++;
-			text = "";
-//			std::cout << idx << '\r';
+			std::cout << idx << '\r';
 		}
 
 
+		std::cout << "writing: " << indexFile << std::endl;
 		writeToBinaryFile( indexFile, mboxIndex, INDEX_MAGIC, INDEX_VERSION, ovmShortDown );
 		std::cout << "found: " << theMails.size() << '/' << m_mailCount << std::endl;
 	}
 	void end( const gak::STRING &path )
 	{
 		std::cout << "end: " << path << std::endl;
+		m_path = "";
 	}
 };
 
@@ -183,6 +205,8 @@ static gak::CommandLine::Options options[] =
 {
 	{ 'M', "meta",	0, 1, FLAG_USE_META, "include meta data in index calculation" },
 	{ 'S', "stopWords",	0, 1, FLAG_STOP_WORDS|gak::CommandLine::needArg, "file with stop words" },
+	{ 'I', "indexPath",	1, 1, FLAG_INDEX_PATH|gak::CommandLine::needArg, "path where to store the index" },
+	{ 'B', "brainPath",	0, 1, FLAG_BRAIN_PATH|gak::CommandLine::needArg, "path where to store the AI brain" },
 	{ 0 }
 };
 
@@ -200,7 +224,7 @@ static gak::CommandLine::Options options[] =
 
 static int mboxIndexer( const gak::CommandLine &cmdLine )
 {
-	int result = EXIT_FAILURE;
+	int result = EXIT_SUCCESS;
 
 	gak::DirectoryScanner<MailIndexer> theScanner(cmdLine);
 
