@@ -552,7 +552,7 @@ static void readSongList(
 
 int main( int argc, const char *argv[] )
 {
-	doEnableLogEx(gakLogging::llInfo)
+	doEnableLogEx(gakLogging::llInfo);
 	doEnterFunctionEx( gakLogging::llInfo, "main");
 
 	Set<STRING>		knownGenres, missingGenres;
