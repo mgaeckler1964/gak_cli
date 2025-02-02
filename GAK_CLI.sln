@@ -49,6 +49,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "season", "TOOLS\season.vcxp
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mboxIndexer", "TOOLS\mboxIndexer.vcxproj", "{86D70153-A734-4F77-8A09-D25A0FE1BD45}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mboxSearch", "TOOLS\mboxSearch.vcxproj", "{F1A83950-469C-46F7-B242-81D6DB53587B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -243,6 +245,14 @@ Global
 		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Release|Win32.Build.0 = Release|Win32
 		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Release|x64.ActiveCfg = Release|x64
 		{86D70153-A734-4F77-8A09-D25A0FE1BD45}.Release|x64.Build.0 = Release|x64
+		{F1A83950-469C-46F7-B242-81D6DB53587B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F1A83950-469C-46F7-B242-81D6DB53587B}.Debug|Win32.Build.0 = Debug|Win32
+		{F1A83950-469C-46F7-B242-81D6DB53587B}.Debug|x64.ActiveCfg = Debug|x64
+		{F1A83950-469C-46F7-B242-81D6DB53587B}.Debug|x64.Build.0 = Debug|x64
+		{F1A83950-469C-46F7-B242-81D6DB53587B}.Release|Win32.ActiveCfg = Release|Win32
+		{F1A83950-469C-46F7-B242-81D6DB53587B}.Release|Win32.Build.0 = Release|Win32
+		{F1A83950-469C-46F7-B242-81D6DB53587B}.Release|x64.ActiveCfg = Release|x64
+		{F1A83950-469C-46F7-B242-81D6DB53587B}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

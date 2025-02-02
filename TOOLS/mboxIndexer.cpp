@@ -49,6 +49,8 @@
 #include <gak/strFiles.h>
 #include <gak/stopWatch.h>
 
+#include "mboxIndex.h"
+
 // --------------------------------------------------------------------- //
 // ----- imported datas ------------------------------------------------ //
 // --------------------------------------------------------------------- //
@@ -76,13 +78,14 @@ static const int FLAG_STOP_WORDS	= 0x020;
 static const int FLAG_INDEX_PATH	= 0x040;
 static const int FLAG_BRAIN_PATH	= 0x080;
 static const int FLAG_THREAD_COUNT	= 0x100;
-static const int FLAG_FORCE		= 0x200;
+static const int FLAG_FORCE			= 0x200;
 
-static const uint32 MBOX_INDEX_MAGIC	= 0x19901993;
-static const uint16 MBOX_INDEX_VERSION	= 0x1;
-
-static const uint32 MAIL_INDEX_MAGIC	= 0x19641964;
-static const uint16 MAIL_INDEX_VERSION	= 0x1;
+static const char CHAR_USE_META		= 'M';
+static const char CHAR_STOP_WORDS	= 'S';
+static const char CHAR_INDEX_PATH	= 'I';
+static const char CHAR_BRAIN_PATH	= 'B';
+static const char CHAR_THREAD_COUNT	= 'T';
+static const char CHAR_FORCE		= 'F';
 
 static const size_t DEF_THREAD_COUNT = 32UL;
 
@@ -93,36 +96,6 @@ static const size_t DEF_THREAD_COUNT = 32UL;
 // --------------------------------------------------------------------- //
 // ----- type definitions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
-
-struct MailAddress
-{
-	STRING		mboxFile;
-	size_t		mailIndex;
-
-	MailAddress(const STRING &mboxFile="", size_t mailIndex=0) : mboxFile(mboxFile), mailIndex(mailIndex) {}
-
-	int compare( const MailAddress &other ) const
-	{
-		int result = gak::compare( mboxFile, other.mboxFile );
-		return result ? result : gak::compare( mailIndex, other.mailIndex );
-	}
-	void toBinaryStream ( std::ostream &stream ) const
-	{
-		gak::toBinaryStream( stream, mboxFile );
-		gak::toBinaryStream( stream, uint64(mailIndex) );
-	}
-	void fromBinaryStream ( std::istream &stream )
-	{
-		gak::fromBinaryStream( stream, &mboxFile );
-		uint64 mailIndex;
-		gak::fromBinaryStream( stream, &mailIndex );
-		this->mailIndex = size_t(mailIndex);
-	}
-};
-
-typedef gak::Index<size_t>			MboxIndex;
-typedef gak::Index<MailAddress>		MailIndex;
-typedef MboxIndex::RelevantHits		MboxSearchResult;
 
 // --------------------------------------------------------------------- //
 // ----- class definitions --------------------------------------------- //
@@ -186,7 +159,7 @@ struct ProcessorType<STRING>
 		s_mailCount = 0;
 		if( cmdLine.flags & FLAG_STOP_WORDS )
 		{
-			STRING stopWordsFile = cmdLine.parameter['S'][0];
+			STRING stopWordsFile = cmdLine.parameter[CHAR_STOP_WORDS][0];
 			std::cout << "Reading " << stopWordsFile << '\n';
 			std::ifstream	in(stopWordsFile);
 			while( in )
@@ -205,20 +178,14 @@ struct ProcessorType<STRING>
 			fp << s_stopWords;
 			fp.close();
 		}
-		s_indexPath = cmdLine.parameter['I'][0];
-		if( !s_indexPath.endsWith(DIRECTORY_DELIMITER) )
-		{
-			s_indexPath += DIRECTORY_DELIMITER;
-		}
+		s_indexPath = cmdLine.parameter[CHAR_INDEX_PATH][0];
+		s_indexPath.condAppend(DIRECTORY_DELIMITER);
 		s_flags = cmdLine.flags;
 	}
 	static void setArg( const gak::STRING &path )
 	{
 		s_arg = path;
-		if( !s_arg.endsWith(DIRECTORY_DELIMITER) )
-		{
-			s_arg += DIRECTORY_DELIMITER;
-		}
+		s_arg.condAppend(DIRECTORY_DELIMITER);
 	}
 
 	void process( const STRING &file )
@@ -228,11 +195,12 @@ struct ProcessorType<STRING>
 
 		F_STRING			theName;
 		STRING				indexFile;
+		STRING				posFile;
 		size_t				idx=0;
 		MboxIndex			mboxIndex;
 		gak::mail::Mails	theMails;
 		std::cout << "process: " << file << std::endl;
-		indexFile = s_indexPath;
+		posFile = indexFile = s_indexPath;
 		if( !s_arg.isEmpty() )
 		{
 			theName = file.subString( s_arg.strlen() );
@@ -241,23 +209,31 @@ struct ProcessorType<STRING>
 		{
 			fsplit(file, NULL, &theName);
 		}
-		indexFile += theName + ".mboxIdx";
+		indexFile += theName + MBOX_INDEX_EXT;
+		posFile += theName + MBOX_POS_EXT;
 
-		if( !(s_flags & FLAG_FORCE) && !strAccess(indexFile,0) )
+		if( !(s_flags & FLAG_FORCE) && !strAccess(indexFile,0) && !strAccess(posFile,0) )
 		{
 			DirectoryEntry theFileEntry(file);
 			DirectoryEntry theIndexEntry(indexFile);
 
 			if( theFileEntry.modifiedDate < theIndexEntry.modifiedDate )
 			{
-				return;
+				DirectoryEntry thePosEntry(posFile);
+				if( theFileEntry.modifiedDate < thePosEntry.modifiedDate )
+				{
+					return;
+				}
 			}
 		}
 
-		gak::mail::loadMboxFile( file, theMails );
+		Array<int64> positions;
+		gak::mail::loadMboxFile( file, theMails, &positions );
 		s_mailCount += theMails.size();
 		doLogValueEx(gakLogging::llInfo, s_mailCount );
-		std::cout << "read " << theMails.size() << " Mails" << std::endl;
+		std::cout << "read " << theMails.size() << " Mails from " << file << std::endl;
+
+		gak::StopWatch	watch(true);
 
 		for( 
 			Mails::iterator it = theMails.begin(), endIT = theMails.end();
@@ -293,12 +269,19 @@ struct ProcessorType<STRING>
 				doLogPositionEx(gakLogging::llInfo);
 			}
 			idx++;
-			std::cout << idx << '\r';
+			if( watch.getMillis() > 1000 )
+			{
+				std::cout << idx << '/' << theMails.size() << "     \r";
+				watch.start();
+			}
 		}
 
 		std::cout << "writing: " << indexFile << std::endl;
 		makePath(indexFile);
 		writeToBinaryFile( indexFile, mboxIndex, MBOX_INDEX_MAGIC, MBOX_INDEX_VERSION, ovmShortDown );
+		std::cout << "writing: " << posFile << std::endl;
+		makePath(posFile);
+		writeToBinaryFile( posFile, positions, MBOX_POS_MAGIC, MBOX_POS_VERSION, ovmShortDown );
 		std::cout << "found: " << theMails.size() << '/' << s_mailCount << std::endl;
 	}
 };
@@ -313,12 +296,12 @@ struct ProcessorType<STRING>
 
 static gak::CommandLine::Options options[] =
 {
-	{ 'M', "meta",			0, 1, FLAG_USE_META, "include meta data in index" },
-	{ 'S', "stopWords",		0, 1, FLAG_STOP_WORDS|gak::CommandLine::needArg, "file with stop words" },
-	{ 'I', "indexPath",		1, 1, FLAG_INDEX_PATH|gak::CommandLine::needArg, "path where to store the index" },
-	{ 'B', "brainPath",		0, 1, FLAG_BRAIN_PATH|gak::CommandLine::needArg, "path where to store the AI brain" },
-	{ 'T', "threadCount",	0, 1, FLAG_THREAD_COUNT|gak::CommandLine::needArg, "number of threads (<32>)" },
-	{ 'F', "force",			0, 1, FLAG_FORCE, "force indexing" },
+	{ CHAR_USE_META,		"meta",			0, 1, FLAG_USE_META, "include meta data in index" },
+	{ CHAR_STOP_WORDS,		"stopWords",	0, 1, FLAG_STOP_WORDS|gak::CommandLine::needArg, "file with stop words" },
+	{ CHAR_INDEX_PATH,		"indexPath",	1, 1, FLAG_INDEX_PATH|gak::CommandLine::needArg, "path where to store the index" },
+	{ CHAR_BRAIN_PATH,		"brainPath",	0, 1, FLAG_BRAIN_PATH|gak::CommandLine::needArg, "path where to store the AI brain" },
+	{ CHAR_THREAD_COUNT,	"threadCount",	0, 1, FLAG_THREAD_COUNT|gak::CommandLine::needArg, "number of threads (<32>)" },
+	{ CHAR_FORCE,			"force",		0, 1, FLAG_FORCE, "force indexing" },
 	{ 0 }
 };
 
@@ -353,7 +336,7 @@ static int mboxIndexer( const gak::CommandLine &cmdLine )
 	size_t threadCount = DEF_THREAD_COUNT;
 	if( cmdLine.flags & FLAG_THREAD_COUNT )
 	{
-		threadCount = gak::getValueE<size_t>(cmdLine.parameter['T'][0]);
+		threadCount = gak::getValueE<size_t>(cmdLine.parameter[CHAR_THREAD_COUNT][0]);
 		if( !threadCount )
 		{
 			threadCount = DEF_THREAD_COUNT;
@@ -364,7 +347,7 @@ static int mboxIndexer( const gak::CommandLine &cmdLine )
 	ProcessorType<STRING>::init(cmdLine);
 
 	MailIndex &index = ProcessorType<MailIndexerCmd>::s_mailIndex;
-	STRING indexFile = ProcessorType<STRING>::s_indexPath + ".mailIndex";
+	STRING indexFile = ProcessorType<STRING>::s_indexPath + MAIL_INDEX_FILE;
 	if( !(cmdLine.flags&FLAG_FORCE) && !strAccess( indexFile, 0 ) )
 	{
 		std::cout << "Reading index" << std::endl;
