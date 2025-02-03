@@ -88,6 +88,12 @@ const int FLAG_CREATE_TREE	= 0x040;
 const int OPT_MAX_AGE		= 0x080;
 const int OPT_MAX_QUEUE		= 0x100;
 
+const int CHAR_DO_COMPARE	= 'C';
+const int CHAR_DO_LOG		= 'L';
+const int CHAR_CREATE_TREE	= 'T';
+const int CHAR_MAX_AGE		= 'A';
+const int CHAR_MAX_QUEUE	= 'Q';
+
 const int COUNT_WIDTH		= 6;
 const int LOCK_WIDTH		= 2;
 
@@ -99,14 +105,14 @@ const int LOCK_WIDTH		= 2;
 // ----- module static data -------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-static LockQueue<STRING>	logStrings;
+static LockQueue<STRING>	s_logStrings;
 static CommandLine::Options options[] =
 {
-	{ 'C', "compare",		0, 1, FLAG_DO_COMPARE },
-	{ 'L', "log",			0, 1, FLAG_DO_LOG },
-	{ 'T', "createTree",	0, 1, FLAG_CREATE_TREE },
-	{ 'A', "maxAge",		0, 1, OPT_MAX_AGE|CommandLine::needArg,	"<max age in day of backup files>" },
-	{ 'Q', "maxQueueLen",	0, 1, OPT_MAX_QUEUE|CommandLine::needArg,	"<max length of process queues>" },
+	{ CHAR_DO_COMPARE,	"compare",		0, 1, FLAG_DO_COMPARE },
+	{ CHAR_DO_LOG,		"log",			0, 1, FLAG_DO_LOG },
+	{ CHAR_CREATE_TREE,	"createTree",	0, 1, FLAG_CREATE_TREE },
+	{ CHAR_MAX_AGE,		"maxAge",		0, 1, OPT_MAX_AGE|CommandLine::needArg,	"<max age in day of backup files>" },
+	{ CHAR_MAX_QUEUE,	"maxQueueLen",	0, 1, OPT_MAX_QUEUE|CommandLine::needArg,	"<max length of process queues>" },
 	{ 0 }
 };
 
@@ -202,8 +208,8 @@ class CollectorThread : public CollectorBase
 	CollectorThread( const STRING &sourcePath, const STRING &excludes, std::size_t maxQueueLen )
 	: CollectorBase( maxQueueLen ), m_sourcePath( sourcePath ), m_excludes(excludes), m_latestDate( time_t(0) )
 	{
-		doEnterFunction("CollectorThread::CollectorThread");
-		StartThread();
+		doEnterFunctionEx(gakLogging::llDetail,"CollectorThread::CollectorThread");
+		StartThread("CollectorThread");
 	}
 
 	virtual void ExecuteThread( void );
@@ -235,7 +241,7 @@ class CollectorThread : public CollectorBase
 				latestDate.getHour(), latestDate.getMinute(), latestDate.getSecond()
 			);
 			const_cast<CollectorThread*>(this)->m_backupPath = m_sourcePath + nowC;
-			logStrings.push( STRING("Latest File: ") + m_latestFile );
+			s_logStrings.push( STRING("Latest File: ") + m_latestFile );
 		}
 		return m_backupPath;
 	}
@@ -267,7 +273,7 @@ class CopyFilterThread : public CollectorBase
 	m_compareMode(compareMode),
 	m_checkCount(0)
 	{
-		StartThread();
+		StartThread("CopyFilterThread");
 	}
 	virtual void ExecuteThread( void );
 	const STRING &getSource( void ) const
@@ -317,10 +323,10 @@ class DeleteFilterThread : public CollectorBase
 	: CollectorBase( maxQueueLen ),
 	m_theSrcCollector(srcCollector),
 	m_theDstCollector(dstCollector),
-	m_sourcePath( src )
+	m_sourcePath( src ),
+	m_compareMode(compareMode)
 	{
-		m_compareMode = compareMode;
-		StartThread();
+		StartThread("DeleteFilterThread");
 	}
 	virtual void ExecuteThread( void );
 	const STRING &getDestination( void ) const
@@ -392,7 +398,7 @@ class CopyThread : public Thread
 		m_permille = 0;
 		m_archiveMode = archiveMode;
 		m_theTreeCreator = theTreeCreator;
-		StartThread();
+		StartThread("CopyThread");
 	}
 	virtual void ExecuteThread( void );
 
@@ -455,11 +461,9 @@ class DeleteThread : public Thread
 		int maxAge,
 		TreeCreator *theTreeCreator
 	)
-	: m_filter(filter)
+	: m_filter(filter), m_maxAge(maxAge), m_theTreeCreator(theTreeCreator)
 	{
-		m_maxAge = maxAge;
-		m_theTreeCreator = theTreeCreator;
-		StartThread();
+		StartThread("DeleteThread");
 	}
 	virtual void ExecuteThread( void );
 
@@ -482,7 +486,7 @@ class CheckSumThread : public Thread
 
 	CheckSumThread( const STRING &fileName ) : m_fileName( fileName )
 	{
-		StartThread();
+		StartThread("CheckSumThread");
 	};
 	virtual void ExecuteThread( void );
 };
@@ -508,6 +512,7 @@ inline STRING getDestFilePath(
 	const STRING &sourcePath,
 	const STRING &destPath )
 {
+	doEnterFunctionEx(gakLogging::llDetail,"getDestFilePath");
 	STRING	tmp = sourceFilePath;
 	tmp += sourcePath.strlen();
 	STRING	destFilePath = destPath + tmp;
@@ -517,6 +522,7 @@ inline STRING getDestFilePath(
 
 static void removeTree( const STRING &tree )
 {
+	doEnterFunctionEx(gakLogging::llInfo,"removeTree");
 	DirectoryList	backups;
 	backups.dirlist( tree );
 	for( 
@@ -545,6 +551,7 @@ static void removeTree( const STRING &tree )
 
 static void mergeBackups( const STRING &oldBackup, const STRING &newBackup, bool createTree )
 {
+	doEnterFunctionEx(gakLogging::llInfo,"mergeBackups");
 	DirectoryList	backups;
 
 	if( !createTree )
@@ -583,7 +590,7 @@ static void mergeBackups( const STRING &oldBackup, const STRING &newBackup, bool
 
 static void deleteOldBackups( const STRING &destination, int maxAge, bool createTree )
 {
-	doEnterFunction("deleteOldBackups");
+	doEnterFunctionEx(gakLogging::llInfo,"deleteOldBackups");
 
 	Date	  		now, lastBackupDate;
 	DirectoryList	backups;
@@ -673,7 +680,7 @@ static void mirror(
 	std::size_t maxQueueLen
 )
 {
-	doEnterFunction( "mirror" );
+	doEnterFunctionEx(gakLogging::llInfo, "mirror" );
 	StopWatch	sw(true);
 	clock_t deleteTime = 0;
 	clock_t copyTime = 0;
@@ -807,15 +814,15 @@ static void mirror(
 		Eta<>::ClockTicks	checkTicks = checkEtaCalculator.getETA(501,1499);
 		Eta<>::ClockTicks	delTicks = delEtaCalculator.getETA(501,1499);
 
-		if( copyTicks > checkTicks &&  copyTicks > delTicks )
+		if( copyTicks >= checkTicks &&  copyTicks >= delTicks && copyTicks > 0 )
 		{
 			std::cout << " co " << copyEtaCalculator;
 		}
-		else if( checkTicks >  delTicks )
+		else if( checkTicks >=  delTicks && checkTicks > 0 )
 		{
 			std::cout << " ch " << checkEtaCalculator;
 		}
-		else if( delTicks && theDeleteConsumer->isRunning )
+		else if( delTicks > 0 && theDeleteConsumer->isRunning )
 		{
 			std::cout << " de " << delEtaCalculator;
 		}
@@ -826,13 +833,13 @@ static void mirror(
 		theCopyConsumer->logDiskSpeed();
 		std::cout << " \r" << std::flush;
 
-		if( doLog && logStrings.size() )
+		if( doLog && s_logStrings.size() )
 		{
 			STRING	logEntry;
 			std::cout << std::endl;
 			do
 			{
-				logEntry = logStrings.pop();
+				logEntry = s_logStrings.pop();
 
 				std::cout << logEntry << std::endl;
 				if( log.rdbuf()->is_open() )
@@ -840,11 +847,11 @@ static void mirror(
 					log << logEntry << '\n';
 				}
 			}
-			while( logStrings.size() );
+			while( s_logStrings.size() );
 		}
 		else
 		{
-			logStrings.clear();
+			s_logStrings.clear();
 		}
 	}
 	sw.stop();
@@ -899,7 +906,7 @@ static void mirror(
 
 static int mirror( const CommandLine &cmdLine )
 {
-	doEnterFunction( "mirror( const CommandLine &cmdLine )" );
+	doEnterFunctionEx(gakLogging::llInfo, "mirror( const CommandLine &cmdLine )" );
 
 	int			maxAge = 0;
 	std::size_t	maxQueueLen = 0;
@@ -909,11 +916,11 @@ static int mirror( const CommandLine &cmdLine )
 
 	if( cmdLine.flags & OPT_MAX_AGE )
 	{
-		maxAge = cmdLine.parameter['A'][0].getValueE<unsigned>();
+		maxAge = cmdLine.parameter[CHAR_MAX_AGE][0].getValueE<unsigned>();
 	}
 	if( cmdLine.flags & OPT_MAX_QUEUE )
 	{
-		maxQueueLen = cmdLine.parameter['Q'][0].getValueE<std::size_t>();
+		maxQueueLen = cmdLine.parameter[CHAR_MAX_QUEUE][0].getValueE<std::size_t>();
 	}
 	doLog = cmdLine.flags & FLAG_DO_LOG;
 	doCompare = cmdLine.flags & FLAG_DO_COMPARE;
@@ -968,7 +975,7 @@ static int mirror( const CommandLine &cmdLine )
 
 void CollectorThread::scanDirectory( const STRING &dir, const F_STRING &excludes )
 {
-	doEnterFunction("CollectorThread::scanDirectory");
+	doEnterFunctionEx(gakLogging::llDetail,"CollectorThread::scanDirectory");
 
 	ArrayOfStrings	excludeList;
 	DirectoryList	dirList;
@@ -979,7 +986,7 @@ void CollectorThread::scanDirectory( const STRING &dir, const F_STRING &excludes
 	}
 	catch( std::exception &e )
 	{
-		logStrings.push( e.what() );
+		s_logStrings.push( e.what() );
 	}
 
 	if( !m_maxQueueLen )
@@ -995,7 +1002,7 @@ void CollectorThread::scanDirectory( const STRING &dir, const F_STRING &excludes
 		excludeList.readFromFile(excludesPath);
 		if( excludeList.size() )
 		{
-			logStrings.push( "Read " + formatNumber( excludeList.size() ) + " exclusions for " + dir );
+			s_logStrings.push( "Read " + formatNumber( excludeList.size() ) + " exclusions for " + dir );
 		}
 	}
 
@@ -1055,17 +1062,30 @@ void CollectorThread::scanDirectory( const STRING &dir, const F_STRING &excludes
 
 void CollectorThread::ExecuteThread( void )
 {
-	doEnterFunction("CollectorThread::ExecuteThread");
+	doEnterFunctionEx(gakLogging::llInfo,"CollectorThread::ExecuteThread");
 
 	m_count = 0;
 	scanDirectory( m_sourcePath, m_excludes );
+	doLogValueEx( gakLogging::llInfo, m_count );
 }
 
 
 void CopyFilterThread::ExecuteThread( void )
 {
-	doEnterFunction("CopyFilterThread::ExecuteThread");
-	bool inputLocked = false;
+	doEnterFunctionEx(gakLogging::llInfo,"CopyFilterThread::ExecuteThread");
+	bool			inputLocked = false;
+	std::ofstream	errFile;
+
+	if( m_compareMode )
+	{
+		STRING	tmp = getTempPath();
+		STRING	errorLog = tmp + DIRECTORY_DELIMITER + "mirror_";
+
+		errorLog += formatNumber( GetCurrentProcessId() );
+		errorLog += "_cf_error.log";
+
+		errFile.open( errorLog );
+	}
 
 	bool		addFile;
 	STRING		reason;
@@ -1146,19 +1166,41 @@ void CopyFilterThread::ExecuteThread( void )
 
 			if( m_compareMode )
 			{
+				bool checkError = false;
 				if( !addFile && !theSourceEntry.directory )
 				{
 					++m_checkCount;
 					SharedObjectPointer<CheckSumThread> md5Source = new CheckSumThread( theSourceFile );
 					SharedObjectPointer<CheckSumThread> md5Dest = new CheckSumThread( theDestFile );
 
+					md5Source->join();
+					md5Dest->join();
+
 					if( waitForThreads() )
 					{
 						if( md5Source->m_hash.getDigest() != md5Dest->m_hash.getDigest() )
 						{
 							addFile = true;
-							reason = "Checksum Failure ";
+							reason = "Checksum Failure\n" + digestStr( md5Source->m_hash.getDigest() ) + '\n' + digestStr( md5Dest->m_hash.getDigest() ) + '\n';
+							if( md5Source->m_hash.m_streamData.size() != md5Dest->m_hash.m_streamData.size() )
+							{
+								reason += "Size: " + gak::formatNumber( md5Source->m_hash.m_streamData.size() ) + ' ' + gak::formatNumber( md5Dest->m_hash.m_streamData.size() ) + '\n';
+							}
+							else
+							{
+								for( size_t i=0; i<md5Source->m_hash.m_streamData.size(); ++i )
+								{
+									if( md5Source->m_hash.m_streamData[i] != md5Dest->m_hash.m_streamData[i] )
+									{
+										reason += "Offset: " + gak::formatNumber( i ) + '/' + gak::formatNumber( md5Dest->m_hash.m_streamData.size() ) + 
+											"\nChar: " + md5Source->m_hash.m_streamData[i] + ' ' + gak::formatNumber(int(md5Source->m_hash.m_streamData[i])) + '/' + md5Dest->m_hash.m_streamData[i] + ' ' + gak::formatNumber(int(md5Dest->m_hash.m_streamData[i])) +'\n';
+									}
+								}
+							}
+
+
 							m_errorCount++;
+							checkError = true;
 						}
 					}
 					else
@@ -1166,6 +1208,7 @@ void CopyFilterThread::ExecuteThread( void )
 						addFile = true;
 						reason = "Thread Failure ";
 						m_errorCount++;
+						checkError = true;
 					}
 
 				}
@@ -1173,7 +1216,11 @@ void CopyFilterThread::ExecuteThread( void )
 				{
 					m_count++;
 					reason += theSourceFile;
-					logStrings.push( reason );
+					s_logStrings.push( reason );
+					if( checkError )
+					{
+						errFile << reason << std::endl;
+					}
 				}
 			}
 			else
@@ -1206,7 +1253,7 @@ void CopyFilterThread::ExecuteThread( void )
 
 void DeleteFilterThread::ExecuteThread( void )
 {
-	doEnterFunction("DeleteFilterThread::ExecuteThread");
+	doEnterFunctionEx(gakLogging::llInfo,"DeleteFilterThread::ExecuteThread");
 
 	bool inputLocked = false;
 	DirectoryQueue	&inputQueue = m_theDstCollector->getQueue();
@@ -1240,7 +1287,7 @@ void DeleteFilterThread::ExecuteThread( void )
 				{
 					logEntry = "Missing ";
 					logEntry += theSourceFile;
-					logStrings.push( logEntry );
+					s_logStrings.push( logEntry );
 
 				}
 				else
@@ -1259,7 +1306,7 @@ void DeleteFilterThread::ExecuteThread( void )
 
 void CopyThread::ExecuteThread()
 {
-	doEnterFunction("CopyThread::ExecuteThread");
+	doEnterFunctionEx(gakLogging::llInfo,"CopyThread::ExecuteThread");
 
 	bool inputLocked = false;
 	STRING			logEntry;
@@ -1401,7 +1448,7 @@ void CopyThread::ExecuteThread()
 				logEntry += theSourceFile.fileName.padCopy( padWidth, STR_P_LEFT );
 				logEntry += " to ";
 				logEntry += theDestFile.padCopy( padWidth, STR_P_LEFT );
-				logStrings.push( logEntry );
+				s_logStrings.push( logEntry );
 
 				try
 				{
@@ -1423,7 +1470,7 @@ void CopyThread::ExecuteThread()
 					logEntry += theSourceFile.fileName;
 					logEntry += " to ";
 					logEntry += theDestFile;
-					logStrings.push( logEntry );
+					s_logStrings.push( logEntry );
 				}
 
 				try
@@ -1440,14 +1487,14 @@ void CopyThread::ExecuteThread()
 			m_count++;
 		}
 	}
-	doLogValue(m_filter->isRunning);
-	doLogValue(copyQueue.size());
+	doLogValueEx(gakLogging::llInfo, m_filter->isRunning);
+	doLogValueEx(gakLogging::llInfo, copyQueue.size());
 	logFile << "Finished copy from " << source << " to " << destination << '\n';
 }
 
 void DeleteThread::ExecuteThread()
 {
-	doEnterFunction("DeleteThread::ExecuteThread");
+	doEnterFunctionEx(gakLogging::llInfo,"DeleteThread::ExecuteThread");
 
 	bool			inputLocked = false;
 	DirectoryQueue	&deleteQueue = m_filter->getQueue();
@@ -1522,8 +1569,10 @@ void DeleteThread::ExecuteThread()
 
 void CheckSumThread::ExecuteThread( void )
 {
+	doEnterFunctionEx(gakLogging::llDetail,"CheckSumThread::ExecuteThread");
 	try
 	{
+		m_hash.m_storeStream = true;
 		m_hash.hash_file( m_fileName );
 	}
 	catch( std::exception &e )
@@ -1543,6 +1592,7 @@ void CheckSumThread::ExecuteThread( void )
 
 void TreeCreator::perform( const STRING &backupPath )
 {
+	doEnterFunctionEx(gakLogging::llInfo,"TreeCreator::perform");
 	LockGuard	lock( m_theLock, 100000 );
 
 	if( lock )
@@ -1553,7 +1603,7 @@ void TreeCreator::perform( const STRING &backupPath )
 			try
 			{
 				STRING	logEntry = STRING("Link ") + m_destination +" to " + backupPath;
-				logStrings.push( logEntry );
+				s_logStrings.push( logEntry );
 				if( dlink( m_destination, backupPath ) )
 				{
 					m_error = true;
@@ -1582,9 +1632,11 @@ void TreeCreator::perform( const STRING &backupPath )
 
 int main( int , const char *argv[] )
 {
-	doEnableLogEx(gakLogging::llInfo);
-
 	int result = EXIT_FAILURE;
+
+	doEnableLogEx(gakLogging::llInfo);
+	doImmediateLog();
+	doEnterFunctionEx(gakLogging::llInfo,"main");
 
 	try
 	{
@@ -1605,6 +1657,8 @@ int main( int , const char *argv[] )
 		std::cerr << argv[0] << ": Unkown error" << std::endl;
 	}
 
+	doFlushLogs();
+	doDisableLog();
 	return result;
 }
 
