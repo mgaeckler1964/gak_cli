@@ -48,6 +48,7 @@
 #include <gak/directoryEntry.h>
 #include <gak/strFiles.h>
 #include <gak/stopWatch.h>
+#include <gak/shared.h>
 
 #include "mboxIndex.h"
 
@@ -67,17 +68,17 @@
 #endif
 
 using namespace gak;
-using gak::mail::Mails;
+using namespace gak::mail;
 
 // --------------------------------------------------------------------- //
 // ----- constants ----------------------------------------------------- //
 // --------------------------------------------------------------------- //
 
 static const int FLAG_USE_META		= 0x010;
-static const int FLAG_STOP_WORDS	= 0x020;
-static const int FLAG_INDEX_PATH	= 0x040;
-static const int FLAG_BRAIN_PATH	= 0x080;
-static const int FLAG_THREAD_COUNT	= 0x100;
+static const int OPT_STOP_WORDS		= 0x020;
+static const int OPT_INDEX_PATH		= 0x040;
+static const int OPT_BRAIN_PATH		= 0x080;
+static const int OPT_THREAD_COUNT	= 0x100;
 static const int FLAG_FORCE			= 0x200;
 
 static const char CHAR_USE_META		= 'M';
@@ -103,31 +104,37 @@ static const size_t DEF_THREAD_COUNT = 32UL;
 
 struct MailIndexerCmd
 {
-	STRING				theName;
-	size_t				idx;
-	gak::StringIndex	index;
+	STRING		theName;
+	size_t		idx;
+	StringIndex	index;
 	
-	MailIndexerCmd() : idx(0) {}
-	MailIndexerCmd(const STRING &theName,size_t idx, const gak::StringIndex &index) : theName(theName),idx(idx), index(index) {}
+	MailIndexerCmd(const STRING &theName, size_t idx, const StringIndex &index) : theName(theName),idx(idx), index(index) {}
 };
 
+typedef SharedPointer<MailIndexerCmd> MailIndexerPtr;
+
+inline MailIndexerPtr createIndexerCmd(const STRING &theName, size_t idx, const StringIndex &index)
+{
+	return MailIndexerPtr::makeShared(theName, idx, index);
+}
 
 template <>
-struct ProcessorType<MailIndexerCmd>
+struct ProcessorType<MailIndexerPtr>
 {
-	typedef MailIndexerCmd object_type;
+	typedef MailIndexerPtr object_type;
 
 	static MailIndex		s_mailIndex;
 	static bool				s_changed;
 	static Locker			s_locker;
 
-	void process( const MailIndexerCmd &cmd )
+	void process( const MailIndexerPtr &ptr )
 	{
 		doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<MailIndexerCmd>::mergeIndex");
 		LockGuard guard( s_locker );
 
 		if( guard )
 		{
+			const MailIndexerCmd &cmd = *ptr;
 			s_mailIndex.mergeIndexPositions( MailAddress(cmd.theName, cmd.idx), cmd.index );
 			s_changed = true;
 		}
@@ -139,7 +146,7 @@ struct ProcessorType<MailIndexerCmd>
 };
 
 
-static ThreadPool<MailIndexerCmd>	*g_IndexerPool=NULL;
+static ThreadPool<MailIndexerPtr>	*g_IndexerPool=NULL;
 
 template <>
 struct ProcessorType<STRING>
@@ -153,11 +160,11 @@ struct ProcessorType<STRING>
 
 	static int				s_flags;
 
-	static void init(const gak::CommandLine	&cmdLine)
+	static void init(const CommandLine	&cmdLine)
 	{
 		doEnterFunctionEx(gakLogging::llInfo, "ProcessorType<STRING>::init");
 		s_mailCount = 0;
-		if( cmdLine.flags & FLAG_STOP_WORDS )
+		if( cmdLine.flags & OPT_STOP_WORDS )
 		{
 			STRING stopWordsFile = cmdLine.parameter[CHAR_STOP_WORDS][0];
 			std::cout << "Reading " << stopWordsFile << '\n';
@@ -182,7 +189,7 @@ struct ProcessorType<STRING>
 		s_indexPath.condAppend(DIRECTORY_DELIMITER);
 		s_flags = cmdLine.flags;
 	}
-	static void setArg( const gak::STRING &path )
+	static void setArg( const STRING &path )
 	{
 		s_arg = path;
 		s_arg.condAppend(DIRECTORY_DELIMITER);
@@ -193,12 +200,12 @@ struct ProcessorType<STRING>
 		doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<STRING>::process");
 		doLogValueEx( gakLogging::llInfo, file );
 
-		F_STRING			theName;
-		STRING				indexFile;
-		STRING				posFile;
-		size_t				idx=0;
-		MboxIndex			mboxIndex;
-		gak::mail::Mails	theMails;
+		F_STRING	theName;
+		STRING		indexFile;
+		STRING		posFile;
+		size_t		idx=0;
+		MboxIndex	mboxIndex;
+		Mails		theMails;
 		std::cout << "process: " << file << std::endl;
 		posFile = indexFile = s_indexPath;
 		if( !s_arg.isEmpty() )
@@ -228,12 +235,12 @@ struct ProcessorType<STRING>
 		}
 
 		Array<int64> positions;
-		gak::mail::loadMboxFile( file, theMails, &positions );
+		loadMboxFile( file, theMails, &positions );
 		s_mailCount += theMails.size();
 		doLogValueEx(gakLogging::llInfo, s_mailCount );
 		std::cout << "read " << theMails.size() << " Mails from " << file << std::endl;
 
-		gak::StopWatch	watch(true);
+		StopWatch	watch(true);
 
 		for( 
 			Mails::iterator it = theMails.begin(), endIT = theMails.end();
@@ -241,7 +248,7 @@ struct ProcessorType<STRING>
 			++it
 		)
 		{
-			const gak::mail::MAIL &theMail = *it;
+			const MAIL &theMail = *it;
 			doLogPositionEx(gakLogging::llInfo);
 			STRING text = theMail.extractPlainText();
 			doLogPositionEx(gakLogging::llInfo);
@@ -258,15 +265,11 @@ struct ProcessorType<STRING>
 					text += it->date.getOriginalTime();
 				}
 
-				doLogPositionEx(gakLogging::llInfo);
-				gak::StringIndex index = gak::indexString(text, s_stopWords);
-				/// TODO: fix problem with mergeIndexPositions it does modifiy the index 8-(
-				gak::StringIndex index2 = index; 
-				doLogPositionEx(gakLogging::llInfo);
+				StringIndex index = indexString(text, s_stopWords);
+				MailIndexerPtr cmd = createIndexerCmd(theName, idx, index);
+				g_IndexerPool->process(cmd);
 				mboxIndex.mergeIndexPositions( idx, index );
 				doLogValueEx(gakLogging::llInfo, mboxIndex.size() );
-				g_IndexerPool->process(MailIndexerCmd(theName, idx, index2));
-				doLogPositionEx(gakLogging::llInfo);
 			}
 			idx++;
 			if( watch.getMillis() > 1000 )
@@ -294,13 +297,13 @@ struct ProcessorType<STRING>
 // ----- module static data -------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-static gak::CommandLine::Options options[] =
+static CommandLine::Options options[] =
 {
 	{ CHAR_USE_META,		"meta",			0, 1, FLAG_USE_META, "include meta data in index" },
-	{ CHAR_STOP_WORDS,		"stopWords",	0, 1, FLAG_STOP_WORDS|gak::CommandLine::needArg, "file with stop words" },
-	{ CHAR_INDEX_PATH,		"indexPath",	1, 1, FLAG_INDEX_PATH|gak::CommandLine::needArg, "path where to store the index" },
-	{ CHAR_BRAIN_PATH,		"brainPath",	0, 1, FLAG_BRAIN_PATH|gak::CommandLine::needArg, "path where to store the AI brain" },
-	{ CHAR_THREAD_COUNT,	"threadCount",	0, 1, FLAG_THREAD_COUNT|gak::CommandLine::needArg, "number of threads (<32>)" },
+	{ CHAR_STOP_WORDS,		"stopWords",	0, 1, OPT_STOP_WORDS|CommandLine::needArg, "file with stop words" },
+	{ CHAR_INDEX_PATH,		"indexPath",	1, 1, OPT_INDEX_PATH|CommandLine::needArg, "path where to store the index" },
+	{ CHAR_BRAIN_PATH,		"brainPath",	0, 1, OPT_BRAIN_PATH|CommandLine::needArg, "path where to store the AI brain" },
+	{ CHAR_THREAD_COUNT,	"threadCount",	0, 1, OPT_THREAD_COUNT|CommandLine::needArg, "number of threads (<32>)" },
 	{ CHAR_FORCE,			"force",		0, 1, FLAG_FORCE, "force indexing" },
 	{ 0 }
 };
@@ -314,9 +317,9 @@ Set<CI_STRING>	ProcessorType<STRING>::s_stopWords;
 STRING			ProcessorType<STRING>::s_arg;
 STRING			ProcessorType<STRING>::s_indexPath;
 
-MailIndex		ProcessorType<MailIndexerCmd>::s_mailIndex;
-bool			ProcessorType<MailIndexerCmd>::s_changed = false;
-Locker			ProcessorType<MailIndexerCmd>::s_locker;
+MailIndex		ProcessorType<MailIndexerPtr>::s_mailIndex;
+bool			ProcessorType<MailIndexerPtr>::s_changed = false;
+Locker			ProcessorType<MailIndexerPtr>::s_locker;
 
 int				ProcessorType<STRING>::s_flags = 0;
 
@@ -328,25 +331,25 @@ int				ProcessorType<STRING>::s_flags = 0;
 // ----- module functions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-static int mboxIndexer( const gak::CommandLine &cmdLine )
+static int mboxIndexer( const CommandLine &cmdLine )
 {
 	doEnterFunctionEx(gakLogging::llInfo, "mboxIndexer");
 	int result = EXIT_SUCCESS;
 
 	size_t threadCount = DEF_THREAD_COUNT;
-	if( cmdLine.flags & FLAG_THREAD_COUNT )
+	if( cmdLine.flags & OPT_THREAD_COUNT )
 	{
-		threadCount = gak::getValueE<size_t>(cmdLine.parameter[CHAR_THREAD_COUNT][0]);
+		threadCount = getValueE<size_t>(cmdLine.parameter[CHAR_THREAD_COUNT][0]);
 		if( !threadCount )
 		{
 			threadCount = DEF_THREAD_COUNT;
 		}
 	}
-	gak::ParalelDirScanner	theScanner("mboxIndexer", cmdLine,threadCount);
+	ParalelDirScanner	theScanner("mboxIndexer", cmdLine,threadCount);
 
 	ProcessorType<STRING>::init(cmdLine);
 
-	MailIndex &index = ProcessorType<MailIndexerCmd>::s_mailIndex;
+	MailIndex &index = ProcessorType<MailIndexerPtr>::s_mailIndex;
 	STRING indexFile = ProcessorType<STRING>::s_indexPath + MAIL_INDEX_FILE;
 	if( !(cmdLine.flags&FLAG_FORCE) && !strAccess( indexFile, 0 ) )
 	{
@@ -365,7 +368,7 @@ static int mboxIndexer( const gak::CommandLine &cmdLine )
 	g_IndexerPool->flush();
 
 
-	if( ProcessorType<MailIndexerCmd>::s_changed )
+	if( ProcessorType<MailIndexerPtr>::s_changed )
 	{
 		std::cout << "writing: " << indexFile << std::endl;
 		makePath(indexFile);
@@ -374,7 +377,7 @@ static int mboxIndexer( const gak::CommandLine &cmdLine )
 		std::cout << "Creating statistic" << std::endl;
 		StatistikData sd = index.getStatistik();
 		std::cout << "Writing statistic " << sd.size() << std::endl;
-		gak::StopWatch	watch(true);
+		StopWatch	watch(true);
 		std::size_t count = 0;
 		std::ofstream	of(ProcessorType<STRING>::s_indexPath+"index.log" );
 		for(
@@ -430,7 +433,7 @@ static int mboxIndexer( const gak::CommandLine &cmdLine )
 
 int main( int , const char *argv[] )
 {
-	g_IndexerPool=new ThreadPool<MailIndexerCmd>(1,"MailIndexer");
+	g_IndexerPool=new ThreadPool<MailIndexerPtr>(1,"MailIndexer");
 
 	doEnableLogEx( gakLogging::llInfo );
 	doEnterFunctionEx(gakLogging::llInfo, "main");
@@ -438,7 +441,7 @@ int main( int , const char *argv[] )
 
 	try
 	{
-		gak::CommandLine cmdLine( options, argv );
+		CommandLine cmdLine( options, argv );
 		result = mboxIndexer( cmdLine );
 	}
 	catch( CmdlineError &e )
