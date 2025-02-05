@@ -49,6 +49,7 @@
 #include <gak/strFiles.h>
 #include <gak/stopWatch.h>
 #include <gak/shared.h>
+#include <gak/aiBrain.h>
 
 #include "mboxIndex.h"
 
@@ -160,6 +161,11 @@ struct ProcessorType<STRING>
 
 	static int				s_flags;
 
+	static Locker			s_locker;
+	static AiBrain			s_Brain;
+	static bool				s_changed;
+	static STRING			s_brainFile;
+
 	static void init(const CommandLine	&cmdLine)
 	{
 		doEnterFunctionEx(gakLogging::llInfo, "ProcessorType<STRING>::init");
@@ -187,6 +193,11 @@ struct ProcessorType<STRING>
 		}
 		s_indexPath = cmdLine.parameter[CHAR_INDEX_PATH][0];
 		s_indexPath.condAppend(DIRECTORY_DELIMITER);
+
+		s_brainFile = cmdLine.parameter[CHAR_BRAIN_PATH][0];
+		s_brainFile.condAppend(DIRECTORY_DELIMITER);
+		s_brainFile += BRAIN_FILE;
+
 		s_flags = cmdLine.flags;
 	}
 	static void setArg( const STRING &path )
@@ -249,9 +260,7 @@ struct ProcessorType<STRING>
 		)
 		{
 			const MAIL &theMail = *it;
-			doLogPositionEx(gakLogging::llInfo);
 			STRING text = theMail.extractPlainText();
-			doLogPositionEx(gakLogging::llInfo);
 			if( !text.isEmpty() )
 			{
 				if( s_flags & FLAG_USE_META )
@@ -264,12 +273,22 @@ struct ProcessorType<STRING>
 					text += it->subject;
 					text += it->date.getOriginalTime();
 				}
-
-				StringIndex index = indexString(text, s_stopWords);
+				StringTokens tokens = tokenString( text, s_stopWords );
+				StringIndex index = processPositions(text, tokens);
 				MailIndexerPtr cmd = createIndexerCmd(theName, idx, index);
 				g_IndexerPool->process(cmd);
 				mboxIndex.mergeIndexPositions( idx, index );
 				doLogValueEx(gakLogging::llInfo, mboxIndex.size() );
+
+				if( s_flags & OPT_BRAIN_PATH )
+				{
+					LockGuard guard(s_locker);
+					if( guard )
+					{
+						s_changed = true;
+						s_Brain.learnFromTokens(text, tokens, 3);
+					}
+				}
 			}
 			idx++;
 			if( watch.getMillis() > 1000 )
@@ -285,7 +304,7 @@ struct ProcessorType<STRING>
 		std::cout << "writing: " << posFile << std::endl;
 		makePath(posFile);
 		writeToBinaryFile( posFile, positions, MBOX_POS_MAGIC, MBOX_POS_VERSION, ovmShortDown );
-		std::cout << "found: " << theMails.size() << '/' << s_mailCount << std::endl;
+		std::cout << "found: " << theMails.size() << '/' << s_mailCount << " int " << file << std::endl;
 	}
 };
 
@@ -316,12 +335,16 @@ size_t			ProcessorType<STRING>::s_mailCount = 0;
 Set<CI_STRING>	ProcessorType<STRING>::s_stopWords;
 STRING			ProcessorType<STRING>::s_arg;
 STRING			ProcessorType<STRING>::s_indexPath;
+Locker			ProcessorType<STRING>::s_locker;
+AiBrain			ProcessorType<STRING>::s_Brain;
+bool			ProcessorType<STRING>::s_changed = false;
+STRING			ProcessorType<STRING>::s_brainFile;
+int				ProcessorType<STRING>::s_flags = 0;
 
 MailIndex		ProcessorType<MailIndexerPtr>::s_mailIndex;
 bool			ProcessorType<MailIndexerPtr>::s_changed = false;
 Locker			ProcessorType<MailIndexerPtr>::s_locker;
 
-int				ProcessorType<STRING>::s_flags = 0;
 
 // --------------------------------------------------------------------- //
 // ----- prototypes ---------------------------------------------------- //
@@ -353,8 +376,16 @@ static int mboxIndexer( const CommandLine &cmdLine )
 	STRING indexFile = ProcessorType<STRING>::s_indexPath + MAIL_INDEX_FILE;
 	if( !(cmdLine.flags&FLAG_FORCE) && !strAccess( indexFile, 0 ) )
 	{
-		std::cout << "Reading index" << std::endl;
+		std::cout << "Reading index " << indexFile << std::endl;
 		readFromBinaryFile( indexFile, &index, MAIL_INDEX_MAGIC, MAIL_INDEX_VERSION, false );
+	}
+
+	AiBrain &brain = ProcessorType<STRING>::s_Brain;
+	const STRING &brainFile = ProcessorType<STRING>::s_brainFile;
+	if( cmdLine.flags & OPT_BRAIN_PATH && !(cmdLine.flags&FLAG_FORCE) && !strAccess( brainFile, 0 ))
+	{
+		std::cout << "Reading brain " << brainFile << std::endl;
+		readFromBinaryFile( brainFile, &brain, BRAIN_MAGIC, BRAIN_VERSION, false );
 	}
 
 	g_IndexerPool->start();
@@ -394,6 +425,13 @@ static int mboxIndexer( const CommandLine &cmdLine )
 			}
 			of << it->m_word << ' ' << it->m_count << '\n';
 		}
+	}
+
+	if( ProcessorType<STRING>::s_changed )
+	{
+		std::cout << "writing: " << brainFile << std::endl;
+		makePath(indexFile);
+		writeToBinaryFile( brainFile, brain, BRAIN_MAGIC, BRAIN_VERSION, ovmShortDown );
 	}
 
 	return result;

@@ -65,18 +65,25 @@
 // ----- constants ----------------------------------------------------- //
 // --------------------------------------------------------------------- //
 
+/// Mailbox index file
 static const gak::uint32 MBOX_INDEX_MAGIC	= 0x19901993;
 static const gak::uint16 MBOX_INDEX_VERSION	= 0x1;
+static const char MBOX_INDEX_EXT[] = ".mboxIdx";
 
-static const gak::uint32 MAIL_INDEX_MAGIC	= 0x19641964;
-static const gak::uint16 MAIL_INDEX_VERSION	= 0x1;
-
+/// Mailbox position file
 static const gak::uint32 MBOX_POS_MAGIC		= 0x19931990;
 static const gak::uint16 MBOX_POS_VERSION	= 0x1;
-
-static const char MAIL_INDEX_FILE[] = ".mailIndex";
-static const char MBOX_INDEX_EXT[] = ".mboxIdx";
 static const char MBOX_POS_EXT[] = ".mboxPos";
+
+/// Mail server index file
+static const gak::uint32 MAIL_INDEX_MAGIC	= 0x19641964;
+static const gak::uint16 MAIL_INDEX_VERSION	= 0x1;
+static const char MAIL_INDEX_FILE[] = ".mailIndex";
+
+// AI mail brain
+static const gak::uint32 BRAIN_MAGIC		= 0x19701974;
+static const gak::uint16 BRAIN_VERSION		= 0x1;
+static const char BRAIN_FILE[] = "mail.BrainIndex";
 
 // --------------------------------------------------------------------- //
 // ----- macros -------------------------------------------------------- //
