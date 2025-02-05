@@ -723,7 +723,6 @@ static void mirror(
 		theDeleteFilter, maxAge, theTreeCreator.get()
 	);
 
-
 	SharedObjectPointer<CopyThread>			theCopyConsumer = new CopyThread(
 		theCopyFilter, maxAge > 0, theTreeCreator.get()
 	);
@@ -814,7 +813,11 @@ static void mirror(
 		Eta<>::ClockTicks	checkTicks = checkEtaCalculator.getETA(501,1499);
 		Eta<>::ClockTicks	delTicks = delEtaCalculator.getETA(501,1499);
 
-		if( copyTicks >= checkTicks &&  copyTicks >= delTicks && copyTicks > 0 )
+		if( compareMode )
+		{
+			std::cout << " m5 " << checkEtaCalculator;
+		}
+		else if( copyTicks >= checkTicks &&  copyTicks >= delTicks && copyTicks > 0 )
 		{
 			std::cout << " co " << copyEtaCalculator;
 		}
@@ -1188,17 +1191,17 @@ void CopyFilterThread::ExecuteThread( void )
 							}
 							else
 							{
-								for( size_t i=0; i<md5Source->m_hash.m_streamData.size(); ++i )
+								size_t maxErrorDisplay = 5;
+								for( size_t j=0, i=0; j<maxErrorDisplay && i<md5Source->m_hash.m_streamData.size(); ++i )
 								{
 									if( md5Source->m_hash.m_streamData[i] != md5Dest->m_hash.m_streamData[i] )
 									{
 										reason += "Offset: " + gak::formatNumber( i ) + '/' + gak::formatNumber( md5Dest->m_hash.m_streamData.size() ) + 
 											"\nChar: " + md5Source->m_hash.m_streamData[i] + ' ' + gak::formatNumber(int(md5Source->m_hash.m_streamData[i])) + '/' + md5Dest->m_hash.m_streamData[i] + ' ' + gak::formatNumber(int(md5Dest->m_hash.m_streamData[i])) +'\n';
+										j++;
 									}
 								}
 							}
-
-
 							m_errorCount++;
 							checkError = true;
 						}
