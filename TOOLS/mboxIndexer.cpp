@@ -395,7 +395,7 @@ static int mboxIndexer( const CommandLine &cmdLine )
 
 		theScanner(cmdLine.argv[i]);
 	}
-	std::cout << "Mbox Indexer completed\nWaiting for full indexer" << std::endl;
+	std::cout << "Mbox Indexer completed\nWaiting for full indexer " << g_IndexerPool->size() << std::endl;
 	g_IndexerPool->flush();
 
 
