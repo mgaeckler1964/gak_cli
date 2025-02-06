@@ -49,6 +49,7 @@
 #include <gak/cmdlineParser.h>
 #include <gak/mboxParser.h>
 #include <gak/exception.h>
+#include <gak/aiBrain.h>
 
 #include "mboxIndex.h"
 
@@ -105,9 +106,9 @@ static const char CHAR_MBOX_PATH	= 'M';
 
 static gak::CommandLine::Options options[] =
 {
-	{ CHAR_INDEX_PATH,	"indexPath",	1, 1, FLAG_INDEX_PATH|gak::CommandLine::needArg, "path where to find the index" },
+	{ CHAR_INDEX_PATH,	"indexPath",	0, 1, FLAG_INDEX_PATH|gak::CommandLine::needArg, "path where to find the index" },
 	{ CHAR_BRAIN_PATH,	"brainPath",	0, 1, FLAG_BRAIN_PATH|gak::CommandLine::needArg, "path where to store the AI brain" },
-	{ CHAR_MBOX_PATH,	"mboxPath",		1, -1, FLAG_MBOX_PATH|gak::CommandLine::needArg, "path where to find the mbox files" },
+	{ CHAR_MBOX_PATH,	"mboxPath",		0, -1, FLAG_MBOX_PATH|gak::CommandLine::needArg, "path where to find the mbox files" },
 	{ 0 }
 };
 
@@ -123,9 +124,44 @@ static gak::CommandLine::Options options[] =
 // ----- module functions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-static void mboxSearch( const gak::CommandLine &cmdLine )
+// -B X:\MailIndex demon force BikeFeeling
+// -B C:\TEMP\gak\Index demon force BikeFeeling
+// -B C:\TEMP\gak\Index demon force BikeFeeling Webspace Ablauf Domain
+static void aiSearch( const gak::CommandLine &cmdLine )
 {
-	doEnterFunctionEx(gakLogging::llInfo, "mboxInmboxSearchdexer");
+	doEnterFunctionEx(gakLogging::llInfo, "aiSearch");
+
+	AiBrain brain;
+
+	STRING brainFile = cmdLine.parameter[CHAR_BRAIN_PATH][0];
+	brainFile.condAppend(DIRECTORY_DELIMITER);
+	brainFile += BRAIN_FILE;
+
+	std::cout << "Reading " << brainFile << std::endl;
+	readFromBinaryFile( brainFile, &brain, BRAIN_MAGIC, BRAIN_VERSION, false );
+
+	std::cout << "Searching in " << brainFile << std::endl;
+	const char *argv;
+	for( int i=1; (argv = cmdLine.argv[i]) != NULL; ++i )
+	{
+		std::cout << "\nSearching for " << argv << std::endl;
+		Set<STRING> partners = brain.getPartners( argv );
+		std::cout << "\nFound:" << std::endl;
+		for(
+			Set<STRING>::const_iterator it = partners.cbegin(), endIT = partners.cend();
+			it != endIT;
+			++it
+		)
+		{
+			std::cout << '\t' << *it  << std::endl;
+		}
+	}
+}
+
+// -I X:\MailIndex -M X:\Mail -M W:\Mail "demon +force" BikeFeeling
+static void indexSearch( const gak::CommandLine &cmdLine )
+{
+	doEnterFunctionEx(gakLogging::llInfo, "indexSearch");
 
 	MailIndex index;
 
@@ -199,6 +235,30 @@ static void mboxSearch( const gak::CommandLine &cmdLine )
 	}
 }
 
+static void mboxSearch( const gak::CommandLine &cmdLine )
+{
+	doEnterFunctionEx(gakLogging::llInfo, "mboxSearch");
+	if( (cmdLine.flags & (FLAG_INDEX_PATH|FLAG_BRAIN_PATH)) == (FLAG_INDEX_PATH|FLAG_BRAIN_PATH) )
+	{
+		throw CmdlineError("Both index and brain path are not allows.");
+	}
+	if((cmdLine.flags & (FLAG_INDEX_PATH|FLAG_BRAIN_PATH)) == 0)
+	{
+		throw CmdlineError("Neither index nor brain path passed.");
+	}
+	if(cmdLine.flags & FLAG_INDEX_PATH)
+	{
+		if( !(cmdLine.flags & FLAG_MBOX_PATH) )
+		{
+			throw CmdlineError("Mbox path missing.");
+		}
+		indexSearch( cmdLine );
+	}
+	else
+	{
+		aiSearch( cmdLine );
+	}
+}
 // --------------------------------------------------------------------- //
 // ----- class inlines ------------------------------------------------- //
 // --------------------------------------------------------------------- //
