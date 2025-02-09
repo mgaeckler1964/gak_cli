@@ -141,20 +141,50 @@ static void aiSearch( const gak::CommandLine &cmdLine )
 	readFromBinaryFile( brainFile, &brain, BRAIN_MAGIC, BRAIN_VERSION, false );
 
 	std::cout << "Searching in " << brainFile << std::endl;
+	Set<STRING> result;
 	const char *argv;
 	for( int i=1; (argv = cmdLine.argv[i]) != NULL; ++i )
 	{
-		std::cout << "\nSearching for " << argv << std::endl;
-		Set<STRING> partners = brain.getPartners( argv );
-		std::cout << "\nFound:" << std::endl;
-		for(
-			Set<STRING>::const_iterator it = partners.cbegin(), endIT = partners.cend();
-			it != endIT;
-			++it
-		)
+		char c = *argv;
+		if( c != '-' && c != '+' )
 		{
-			std::cout << '\t' << *it  << std::endl;
+			std::cout << "\nSearching for " << argv << std::endl;
+			Set<STRING> partners = brain.getPartners( argv );
+			mergeSet(&result, partners);
 		}
+	}
+	for( int i=1; (argv = cmdLine.argv[i]) != NULL; ++i )
+	{
+		char c = *argv;
+		if( c == '+' )
+		{
+			argv++;
+			std::cout << "\nSearching for " << argv << std::endl;
+			Set<STRING> partners = brain.getPartners( argv );
+			Set<STRING> tmpResult;
+			intersectSorted( result, partners, std::back_inserter( tmpResult ) );
+			result.moveFrom( tmpResult );
+		}
+	}
+	for( int i=1; (argv = cmdLine.argv[i]) != NULL; ++i )
+	{
+		char c = *argv;
+		if( c == '-' )
+		{
+			argv++;
+			std::cout << "\nSearching for " << argv << std::endl;
+			Set<STRING> partners = brain.getPartners( argv );
+			result.moveFrom( substractSorted( result, partners ) );
+		}
+	}
+	std::cout << "\nFound:" << std::endl;
+	for(
+		Set<STRING>::const_iterator it = result.cbegin(), endIT = result.cend();
+		it != endIT;
+		++it
+	)
+	{
+		std::cout << '\t' << *it  << std::endl;
 	}
 }
 
