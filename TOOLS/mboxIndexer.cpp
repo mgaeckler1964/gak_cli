@@ -81,6 +81,7 @@ static const int OPT_INDEX_PATH		= 0x040;
 static const int OPT_BRAIN_PATH		= 0x080;
 static const int OPT_THREAD_COUNT	= 0x100;
 static const int FLAG_FORCE			= 0x200;
+static const int OPT_WORD_DISTANCE	= 0x400;
 
 static const char CHAR_USE_META		= 'M';
 static const char CHAR_STOP_WORDS	= 'S';
@@ -88,8 +89,10 @@ static const char CHAR_INDEX_PATH	= 'I';
 static const char CHAR_BRAIN_PATH	= 'B';
 static const char CHAR_THREAD_COUNT	= 'T';
 static const char CHAR_FORCE		= 'F';
+static const char CHAR_DISTANCE		= 'D';
 
 static const size_t DEF_THREAD_COUNT = 32UL;
+static const size_t DEF_WORD_DISTANCE = 3UL;
 
 // --------------------------------------------------------------------- //
 // ----- macros -------------------------------------------------------- //
@@ -165,6 +168,7 @@ struct ProcessorType<STRING>
 	static AiBrain			s_Brain;
 	static bool				s_changed;
 	static STRING			s_brainFile;
+	static size_t			s_wordDistance;
 
 	static void init(const CommandLine	&cmdLine)
 	{
@@ -199,6 +203,14 @@ struct ProcessorType<STRING>
 		s_brainFile += BRAIN_FILE;
 
 		s_flags = cmdLine.flags;
+		if( cmdLine.flags & OPT_WORD_DISTANCE )
+		{
+			s_wordDistance = getValueE<size_t>(cmdLine.parameter[CHAR_DISTANCE][0]);
+			if( !s_wordDistance )
+			{
+				s_wordDistance = DEF_WORD_DISTANCE;
+			}
+		}
 	}
 	static void setArg( const STRING &path )
 	{
@@ -286,7 +298,7 @@ struct ProcessorType<STRING>
 					if( guard )
 					{
 						s_changed = true;
-						s_Brain.learnFromTokens(text, tokens, 3);
+						s_Brain.learnFromTokens(text, tokens, s_wordDistance);
 					}
 				}
 			}
@@ -324,6 +336,7 @@ static CommandLine::Options options[] =
 	{ CHAR_BRAIN_PATH,		"brainPath",	0, 1, OPT_BRAIN_PATH|CommandLine::needArg, "path where to store the AI brain" },
 	{ CHAR_THREAD_COUNT,	"threadCount",	0, 1, OPT_THREAD_COUNT|CommandLine::needArg, "number of threads (<32>)" },
 	{ CHAR_FORCE,			"force",		0, 1, FLAG_FORCE, "force indexing" },
+	{ CHAR_DISTANCE,		"maxDistance",	0, 1, OPT_WORD_DISTANCE|CommandLine::needArg, "max. word distance for AI (<3>)" },
 	{ 0 }
 };
 
@@ -340,6 +353,7 @@ AiBrain			ProcessorType<STRING>::s_Brain;
 bool			ProcessorType<STRING>::s_changed = false;
 STRING			ProcessorType<STRING>::s_brainFile;
 int				ProcessorType<STRING>::s_flags = 0;
+size_t			ProcessorType<STRING>::s_wordDistance = DEF_WORD_DISTANCE;
 
 MailIndex		ProcessorType<MailIndexerPtr>::s_mailIndex;
 bool			ProcessorType<MailIndexerPtr>::s_changed = false;
