@@ -34,6 +34,8 @@
 // ----- switches ------------------------------------------------------ //
 // --------------------------------------------------------------------- //
 
+#define DEBUG_LOG		1
+#define PROFILER		1
 #define USE_PAIR_MAP	0		// for searching pair map is better than TreeMap that is faster for indexing
 
 // --------------------------------------------------------------------- //
@@ -91,7 +93,7 @@ static const char CHAR_THREAD_COUNT	= 'T';
 static const char CHAR_FORCE		= 'F';
 static const char CHAR_DISTANCE		= 'D';
 
-static const size_t DEF_THREAD_COUNT = 32UL;
+static const size_t DEF_THREAD_COUNT = 8UL;
 static const size_t DEF_WORD_DISTANCE = 3UL;
 
 // --------------------------------------------------------------------- //
@@ -105,6 +107,25 @@ static const size_t DEF_WORD_DISTANCE = 3UL;
 // --------------------------------------------------------------------- //
 // ----- class definitions --------------------------------------------- //
 // --------------------------------------------------------------------- //
+
+static void showProgress( size_t idx, size_t max )
+{
+	static Locker		s_locker;
+	static StopWatch	s_watch(true);
+
+	if( s_watch.getMillis() > 1000 )
+	{
+		LockGuard guard( s_locker );
+		if( guard )
+		{
+			if( s_watch.getMillis() > 1000 )
+			{
+				std::cout << idx << '/' << max << "     \r";
+				s_watch.start();
+			}
+		}
+	}
+}
 
 struct MailIndexerCmd
 {
@@ -263,8 +284,6 @@ struct ProcessorType<STRING>
 		doLogValueEx(gakLogging::llInfo, s_mailCount );
 		std::cout << "read " << theMails.size() << " Mails from " << file << std::endl;
 
-		StopWatch	watch(true);
-
 		for( 
 			Mails::iterator it = theMails.begin(), endIT = theMails.end();
 			it != endIT;
@@ -303,11 +322,7 @@ struct ProcessorType<STRING>
 				}
 			}
 			idx++;
-			if( watch.getMillis() > 1000 )
-			{
-				std::cout << idx << '/' << theMails.size() << "     \r";
-				watch.start();
-			}
+			showProgress( idx, theMails.size() );
 		}
 
 		std::cout << "writing: " << indexFile << std::endl;
@@ -412,6 +427,25 @@ static int mboxIndexer( const CommandLine &cmdLine )
 	std::cout << "Mbox Indexer completed\nWaiting for full indexer " << g_IndexerPool->size() << std::endl;
 	g_IndexerPool->flush();
 
+	std::cout << __FILE__ << __LINE__ << ' ' << ProcessorType<STRING>::s_stopWords.size() << std::endl;
+	ProcessorType<STRING>::s_stopWords.clear();
+
+	doLogPositionEx( gakLogging::llInfo );
+	if( ProcessorType<STRING>::s_changed )
+	{
+		doLogPositionEx( gakLogging::llInfo );
+		std::cout << "writing: " << brainFile << std::endl;
+		makePath(indexFile);
+		writeToBinaryFile( brainFile, brain, BRAIN_MAGIC, BRAIN_VERSION, ovmShortDown );
+		doLogPositionEx( gakLogging::llInfo );
+		brain.clear();
+		doLogPositionEx( gakLogging::llInfo );
+	}
+	else
+	{
+		doLogPositionEx( gakLogging::llInfo );
+		std::cout << "Not writing: " << brainFile << std::endl;
+	}
 
 	if( ProcessorType<MailIndexerPtr>::s_changed )
 	{
@@ -422,7 +456,6 @@ static int mboxIndexer( const CommandLine &cmdLine )
 		std::cout << "Creating statistic" << std::endl;
 		StatistikData sd = index.getStatistik();
 		std::cout << "Writing statistic " << sd.size() << std::endl;
-		StopWatch	watch(true);
 		std::size_t count = 0;
 		std::ofstream	of(ProcessorType<STRING>::s_indexPath+"index.log" );
 		for(
@@ -432,24 +465,18 @@ static int mboxIndexer( const CommandLine &cmdLine )
 		)
 		{
 			++count;
-			if( watch.getMillis() > 1000 )
-			{
-				std::cout << count << '\r';
-				watch.start();
-			}
 			of << it->m_word << ' ' << it->m_count << '\n';
+			showProgress( count, sd.size() );
 		}
+		doLogPositionEx( gakLogging::llInfo );
+		sd.clear();
+		doLogPositionEx( gakLogging::llInfo );
+		index.clear();
+		doLogPositionEx( gakLogging::llInfo );
 	}
-
-	if( ProcessorType<STRING>::s_changed )
-	{
-		std::cout << "writing: " << brainFile << std::endl;
-		makePath(indexFile);
-		writeToBinaryFile( brainFile, brain, BRAIN_MAGIC, BRAIN_VERSION, ovmShortDown );
-	}
-
 	return result;
 }
+
 
 // --------------------------------------------------------------------- //
 // ----- class inlines ------------------------------------------------- //
@@ -485,10 +512,11 @@ static int mboxIndexer( const CommandLine &cmdLine )
 
 int main( int , const char *argv[] )
 {
-	g_IndexerPool=new ThreadPool<MailIndexerPtr>(1,"MailIndexer");
-
 	doEnableLogEx( gakLogging::llInfo );
 	doEnterFunctionEx(gakLogging::llInfo, "main");
+
+	g_IndexerPool=new ThreadPool<MailIndexerPtr>(1,"MailIndexer");
+
 	int result = EXIT_FAILURE;
 
 	try
