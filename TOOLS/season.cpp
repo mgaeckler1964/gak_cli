@@ -136,7 +136,7 @@ static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *ev
 	secondsLeft = showUnit<SECONDS_PER_HOUR, 2>(secondsLeft);
 	secondsLeft = showUnit<SECONDS_PER_MINUTE, 3>(secondsLeft);
 	secondsLeft = showUnit<1, 4>(secondsLeft);
-	std::cout << "bis zum n\x84" "chsten " << eventName << std::endl;	// nächsten
+	std::cout << "bis zum n" OEM_ae "chsten " << eventName << std::endl;	// nächsten
 }
 
 // --------------------------------------------------------------------- //

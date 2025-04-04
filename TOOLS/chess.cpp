@@ -146,25 +146,15 @@ static int chess( const CommandLine &cmdLine )
 		{
 			break;
 		}
-		std::cout << move.fig->getLetter() << move.src.col << int(move.src.row);
-		if( move.captured )
-		{
-			std::cout << 'x';
-		}
-		else
-		{
-			std::cout << '-';
-		}
-		std::cout << move.dest.col << int(move.dest.row);
 		if( move.promotionType != chess::Figure::ftNone )
 		{
-			char newFig = theBoard.promote(move.fig, move.promotionType, move.dest );
-			std::cout << newFig;
+			theBoard.promote(move.fig, move.promotionType, move.dest );
 		}
 		else
 		{
 			theBoard.moveTo( move.fig, move.dest);
 		}
+		std::cout << move.toString();
 		if( theBoard.isWhiteTurn() )
 		{
 			std::cout << std::endl;
