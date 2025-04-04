@@ -51,6 +51,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mboxIndexer", "TOOLS\mboxIn
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mboxSearch", "TOOLS\mboxSearch.vcxproj", "{F1A83950-469C-46F7-B242-81D6DB53587B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "chess", "TOOLS\chess.vcxproj", "{260D2647-C91F-4471-B0B1-3D71C1EBA260}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -253,6 +255,14 @@ Global
 		{F1A83950-469C-46F7-B242-81D6DB53587B}.Release|Win32.Build.0 = Release|Win32
 		{F1A83950-469C-46F7-B242-81D6DB53587B}.Release|x64.ActiveCfg = Release|x64
 		{F1A83950-469C-46F7-B242-81D6DB53587B}.Release|x64.Build.0 = Release|x64
+		{260D2647-C91F-4471-B0B1-3D71C1EBA260}.Debug|Win32.ActiveCfg = Debug|Win32
+		{260D2647-C91F-4471-B0B1-3D71C1EBA260}.Debug|Win32.Build.0 = Debug|Win32
+		{260D2647-C91F-4471-B0B1-3D71C1EBA260}.Debug|x64.ActiveCfg = Debug|x64
+		{260D2647-C91F-4471-B0B1-3D71C1EBA260}.Debug|x64.Build.0 = Debug|x64
+		{260D2647-C91F-4471-B0B1-3D71C1EBA260}.Release|Win32.ActiveCfg = Release|Win32
+		{260D2647-C91F-4471-B0B1-3D71C1EBA260}.Release|Win32.Build.0 = Release|Win32
+		{260D2647-C91F-4471-B0B1-3D71C1EBA260}.Release|x64.ActiveCfg = Release|x64
+		{260D2647-C91F-4471-B0B1-3D71C1EBA260}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
