@@ -39,6 +39,7 @@
 // --------------------------------------------------------------------- //
 
 #include <iostream>
+#include <iomanip>
 
 #include <gak/datetime.h>
 
@@ -173,6 +174,29 @@ static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *ev
 
 int main( void )
 {
+	unsigned long long runningTime = GetTickCount64();
+
+	const unsigned long long perSecond = 1000;
+	const unsigned long long perMinute = perSecond * 60;
+	const unsigned long long perHour = perMinute * 60;
+	const unsigned long long perDay = perHour * 24;
+	const unsigned long long perWeek = perDay*7;  
+	const unsigned long long weeks = runningTime / perWeek;
+	runningTime %= perWeek;
+	const unsigned long long days = runningTime / perDay;
+	runningTime %= perDay;
+	const unsigned long long hours = runningTime / perHour;
+	runningTime %= perHour;
+	const unsigned long long minutes = runningTime / perMinute;
+	runningTime %= perMinute;
+	const unsigned long long seconds = runningTime / perSecond;
+
+	std::cout << "Laufzeit: " << weeks << " Woche" << (weeks != 1 ? "n" : "") << ", " << 
+		days << " Tag" << (days != 1 ? "e" : "") << ", " << 
+		std::setw(2) << std::setfill('0') << hours << ':' << 
+		std::setw(2) << std::setfill('0') << minutes << ':' << 
+		std::setw(2) << std::setfill('0') << seconds << std::endl;
+
 	gak::DateTime now;
 	gak::DateTime::Season	season = now.getSeason();
 	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now << ' ' << seasons[season] << std::endl;
@@ -216,7 +240,7 @@ int main( void )
 
 		moonLevelTime = nextNewMoon.getUtcUnixSeconds() - now.getUtcUnixSeconds();
 	}
-	int moonPercent = moonLevelTime*100.0/(gak::AVG_MOON_PHASE2) +0.5;
+	int moonPercent = int(moonLevelTime*100.0/(gak::AVG_MOON_PHASE2) +0.5);
 	std::cout << moonPercent << "% Mondphase" << std::endl;
 
 }
