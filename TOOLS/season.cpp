@@ -3,10 +3,10 @@
 		Module:			
 		Description:	
 		Author:			Martin Gäckler
-		Address:		HoFmannsthalweg 14, A-4030 Linz
+		Address:		Hofmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/
 
-		Copyright:		(c) 1988-2024 Martin Gäckler
+		Copyright:		(c) 1988-2025 Martin Gäckler
 
 		This program is free software: you can redistribute it and/or modify  
 		it under the terms of the GNU General Public License as published by  
@@ -28,7 +28,6 @@
 		OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 		SUCH DAMAGE.
 */
-
 
 // --------------------------------------------------------------------- //
 // ----- switches ------------------------------------------------------ //
@@ -69,6 +68,9 @@
 // --------------------------------------------------------------------- //
 // ----- type definitions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
+
+typedef DWORD (*fpGetTickCount)();
+typedef ULONGLONG (*fpGetTickCount64)();
 
 // --------------------------------------------------------------------- //
 // ----- class definitions --------------------------------------------- //
@@ -174,7 +176,11 @@ static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *ev
 
 int main( void )
 {
-	unsigned long long runningTime = GetTickCount64();
+	HINSTANCE			kernel = LoadLibrary( "KERNEL32.DLL" );
+	fpGetTickCount		fpGetTickCountPtr = reinterpret_cast<fpGetTickCount>(GetProcAddress(kernel, "GetTickCount" ));
+	fpGetTickCount64	fpGetTickCount64Ptr = reinterpret_cast<fpGetTickCount64>(GetProcAddress(kernel, "GetTickCount64" ));
+
+	unsigned long long runningTime = fpGetTickCount64Ptr ? fpGetTickCount64Ptr() : fpGetTickCountPtr();
 
 	const unsigned long long perSecond = 1000;
 	const unsigned long long perMinute = perSecond * 60;
