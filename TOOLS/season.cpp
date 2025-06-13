@@ -129,14 +129,30 @@ std::time_t showUnit( std::time_t secondsLeft )
 
 static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *eventName )
 {
-	std::time_t secondsLeft = event.getUtcUnixSeconds() - now.getUtcUnixSeconds();
+	std::time_t secondsEvent = event.getUtcUnixSeconds();
+	std::time_t secondsNow = now.getUtcUnixSeconds();
+	std::time_t secondsLeft;
+	bool future;
+	if( secondsEvent >= secondsNow )
+	{
+		secondsLeft = secondsEvent - secondsNow;
+		future = true;
+	}
+	else
+	{
+		secondsLeft = secondsNow - secondsEvent;
+		future = false;
+	}
 
 	secondsLeft = showUnit<SECONDS_PER_WEEK, 0>(secondsLeft);
 	secondsLeft = showUnit<SECONDS_PER_DAY, 1>(secondsLeft);
 	secondsLeft = showUnit<SECONDS_PER_HOUR, 2>(secondsLeft);
 	secondsLeft = showUnit<SECONDS_PER_MINUTE, 3>(secondsLeft);
 	secondsLeft = showUnit<1, 4>(secondsLeft);
-	std::cout << "bis zum n" OEM_ae "chsten " << eventName << std::endl;	// nächsten
+
+	std::cout << (future ? "bis zum n" OEM_ae "chsten "	// nächsten
+						 : "seit letzten ")
+		<< eventName << std::endl;
 }
 
 // --------------------------------------------------------------------- //
@@ -229,6 +245,7 @@ int main( void )
 	{
 		showTimeLeft( now, nextFullMoon, "Vollmond" );
 		showTimeLeft( now, nextNewMoon, "Neumond" );
+		showTimeLeft( now, now.lastNewMoon(), "Neumond" );
 
 		moonLevelTime = gak::AVG_MOON_PHASE2 - (nextFullMoon.getUtcUnixSeconds() - now.getUtcUnixSeconds());
 	}
@@ -236,6 +253,7 @@ int main( void )
 	{
 		showTimeLeft( now, nextNewMoon, "Neumond" );
 		showTimeLeft( now, nextFullMoon, "Vollmond" );
+		showTimeLeft( now, now.lastFullMoon(), "Vollmond" );
 
 		moonLevelTime = nextNewMoon.getUtcUnixSeconds() - now.getUtcUnixSeconds();
 	}
