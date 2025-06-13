@@ -69,9 +69,6 @@
 // ----- type definitions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-typedef DWORD (*fpGetTickCount)();
-typedef ULONGLONG (*fpGetTickCount64)();
-
 // --------------------------------------------------------------------- //
 // ----- class definitions --------------------------------------------- //
 // --------------------------------------------------------------------- //
@@ -176,11 +173,7 @@ static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *ev
 
 int main( void )
 {
-	HINSTANCE			kernel = LoadLibrary( "KERNEL32.DLL" );
-	fpGetTickCount		fpGetTickCountPtr = reinterpret_cast<fpGetTickCount>(GetProcAddress(kernel, "GetTickCount" ));
-	fpGetTickCount64	fpGetTickCount64Ptr = reinterpret_cast<fpGetTickCount64>(GetProcAddress(kernel, "GetTickCount64" ));
-
-	unsigned long long runningTime = fpGetTickCount64Ptr ? fpGetTickCount64Ptr() : fpGetTickCountPtr();
+	unsigned long long runningTime = uptime();
 
 	const unsigned long long perSecond = 1000;
 	const unsigned long long perMinute = perSecond * 60;
