@@ -38,10 +38,12 @@
 // ----- includes ------------------------------------------------------ //
 // --------------------------------------------------------------------- //
 
+#include <gak/cmdlineParser.h>
 #include <gak/directory.h>
 #include <gak/map.h>
 #include <gak/fileID.h>
 #include <gak/hash.h>
+#include <gak/strFiles.h>
 
 // --------------------------------------------------------------------- //
 // ----- imported datas ------------------------------------------------ //
@@ -61,6 +63,10 @@
 // --------------------------------------------------------------------- //
 // ----- constants ----------------------------------------------------- //
 // --------------------------------------------------------------------- //
+
+const int OPT_DELETE	= 0x010;
+
+const int OPT_CHAR_DELETE	= 'D';
 
 // --------------------------------------------------------------------- //
 // ----- macros -------------------------------------------------------- //
@@ -88,6 +94,12 @@ typedef gak::TreeMap<Digest, gak::ArrayOfStrings>	HashMap;
 // ----- module static data -------------------------------------------- //
 // --------------------------------------------------------------------- //
 
+static gak::CommandLine::Options options[] =
+{
+	{ OPT_CHAR_DELETE,	"delete", 0, 1, OPT_DELETE|gak::CommandLine::needArg,  "<subpath>: delete twins from subpath" },
+	{ 0 }
+};
+
 // --------------------------------------------------------------------- //
 // ----- class static data --------------------------------------------- //
 // --------------------------------------------------------------------- //
@@ -100,16 +112,18 @@ typedef gak::TreeMap<Digest, gak::ArrayOfStrings>	HashMap;
 // ----- module functions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-static int twins( int argc, char *argv[] )
+static int twins( const gak::CommandLine &cmdLine )
 {
 	gak::DirectoryList		content;
 	FileIdMap				fileListById;
 	HashMap					fileListByHash;
 
+	if( cmdLine.argc != 2 )
+		throw gak::CmdlineError();
+
 	std::cout << "Scanning drive\n";
-	if( argc != 2 )
-		throw std::exception( "usage: twins <directory>" );
-	content.dirtree( argv[1], "*" );
+
+	content.dirtree( cmdLine.argv[1], "*" );
 	std::cout << "Found " << content.size() << " item(s)\n";
 
 	std::cout << "Checking fileIDs\n";
@@ -160,6 +174,7 @@ static int twins( int argc, char *argv[] )
 		const gak::ArrayOfStrings	&fileList = it->getValue();
 		if( fileList.size() > 1 )
 		{
+			std::cout << "identical (same) files:\n";
 			std::cout << it->getKey() << std::endl;
 			for(
 				gak::ArrayOfStrings::const_iterator it = fileList.cbegin(), endIT = fileList.cend();
@@ -181,14 +196,25 @@ static int twins( int argc, char *argv[] )
 		const gak::ArrayOfStrings	&fileList = it->getValue();
 		if( fileList.size() > 1 )
 		{
-			std::cout << "identical files:\n";
+			std::cout << "identical (copied) files:\n";
 			for(
 				gak::ArrayOfStrings::const_iterator it = fileList.cbegin(), endIT = fileList.cend();
 				it != endIT;
 				++it
 			)
 			{
-				std::cout << it->convertToTerminal() << std::endl;
+				const gak::STRING &fName = *it;
+				std::cout << fName.convertToTerminal();
+				if( cmdLine.flags & OPT_DELETE && fName.beginsWith(cmdLine.parameter[OPT_CHAR_DELETE][0]) )
+				{
+					std::cout << " --DELETED--";
+					int err = gak::strRemove(fName);
+					if( err )
+					{
+						throw gak::RemoveError( fName );
+					}
+				}
+				std::cout <<std::endl;
 			}
 		}
 	}
@@ -228,13 +254,20 @@ static int twins( int argc, char *argv[] )
 // ----- entry points -------------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-int main( int argc, char *argv[] )
+int main( int, const char *argv[] )
 {
-	int result;
+	int result=0;
 
 	try
 	{
-		result = twins( argc, argv );
+		gak::CommandLine cmdLine( options, argv );
+
+		result = twins( cmdLine );
+	}
+	catch( gak::CmdlineError &e )
+	{
+		std::cerr << argv[0] << ": " << e.what() << std::endl;
+		std::cerr << "Usage: " << argv[0] << " [-d <subpath>] <arg>\n" << options;
 	}
 	catch( std::exception &e )
 	{
