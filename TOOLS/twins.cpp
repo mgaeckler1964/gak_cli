@@ -208,11 +208,7 @@ static int twins( const gak::CommandLine &cmdLine )
 				if( cmdLine.flags & OPT_DELETE && fName.beginsWith(cmdLine.parameter[OPT_CHAR_DELETE][0]) )
 				{
 					std::cout << " --DELETED--";
-					int err = gak::strRemove(fName);
-					if( err )
-					{
-						throw gak::RemoveError( fName );
-					}
+					gak::strRemoveE(fName);
 				}
 				std::cout <<std::endl;
 			}

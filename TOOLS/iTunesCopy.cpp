@@ -397,7 +397,7 @@ static bool cleanPlayer( const STRING &path )
 	if( deletePath )
 	{
 		std::cout << "removing " << path.convertToTerminal() << '\n';
-		strRmdir( path );
+		strRmdirE( path );
 	}
 
 	return deletePath;
