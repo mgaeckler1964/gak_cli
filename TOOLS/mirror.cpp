@@ -1110,7 +1110,7 @@ void CopyFilterThread::ExecuteThread( void )
 			inputQueue.getLocker().lock();
 			inputLocked = true;
 		}
-		if( inputQueue.wait(randomNumber(1000)) )
+		if( inputQueue.wait(2000) )
 		{
 			addFile = false;
 			reason = (const char *)NULL;
@@ -1275,7 +1275,7 @@ void DeleteFilterThread::ExecuteThread( void )
 			inputQueue.getLocker().lock();
 			inputLocked = true;
 		}
-		if( inputQueue.wait(randomNumber(1000)) )
+		if( inputQueue.wait(2000) )
 		{
 			DirectoryEntry theDestFile = inputQueue.pop();
 			inputQueue.unlock();
