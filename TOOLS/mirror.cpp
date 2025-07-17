@@ -40,6 +40,8 @@
 #define NOTHREADS
 #endif
 
+#define PROFILER 1
+
 // --------------------------------------------------------------------- //
 // ----- includes ------------------------------------------------------ //
 // --------------------------------------------------------------------- //
@@ -1095,6 +1097,7 @@ void CopyFilterThread::ExecuteThread( void )
 
 	if( m_theDstCollector )
 	{
+		doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::join");
 		join( m_theDstCollector );
 	}
 
@@ -1110,13 +1113,18 @@ void CopyFilterThread::ExecuteThread( void )
 			inputQueue.getLocker().lock();
 			inputLocked = true;
 		}
-		if( inputQueue.wait(randomNumber(1000)) )
+		bool waited = false;
+		if( (inputQueue.size()>0) || (waited=inputQueue.pwait(2000))==true )
 		{
+			doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::processor");
 			addFile = false;
 			reason = (const char *)NULL;
 			DirectoryEntry theSourceEntry = inputQueue.pop();
 			const STRING &theSourceFile = theSourceEntry.fileName;
-			inputQueue.unlock();
+			if( waited )
+			{
+				inputQueue.unlock();
+			}
 
 			STRING theDestFile = getDestFilePath(
 				theSourceFile, source, m_destinationPath
@@ -1124,6 +1132,7 @@ void CopyFilterThread::ExecuteThread( void )
 
 			if( m_theDstCollector )
 			{
+				doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::findElement");
 				const DirectoryEntry *tmp = m_theDstCollector->findElement( theDestFile );
 				if( tmp )
 				{
@@ -1136,6 +1145,7 @@ void CopyFilterThread::ExecuteThread( void )
 			}
 			else
 			{
+				doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::findFile");
 				theDestEntry.findFile( theDestFile );
 			}
 
@@ -1152,6 +1162,7 @@ void CopyFilterThread::ExecuteThread( void )
 			}
 			else
 			{
+				doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::check");
 				if( addFile
 				|| theSourceEntry.fileSize != theDestEntry.fileSize
 				|| abs(
@@ -1241,9 +1252,10 @@ void CopyFilterThread::ExecuteThread( void )
 #ifdef _Windows
 				else if( m_archiveMode )
 				{
-					unsigned long attr = GetFileAttributes( theSourceFile );
-					if( attr & FILE_ATTRIBUTE_ARCHIVE )
+					doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::m_archiveMode");
+					if( theSourceEntry.needBackup )
 					{
+						unsigned long attr = GetFileAttributes( theSourceFile );
 						attr &= ~FILE_ATTRIBUTE_ARCHIVE;
 						SetFileAttributes( theSourceFile, attr );
 					}
@@ -1265,6 +1277,7 @@ void DeleteFilterThread::ExecuteThread( void )
 
 	if( m_theSrcCollector )
 	{
+		doEnterFunctionEx(gakLogging::llDetail,"DeleteFilterThread::ExecuteThread::join");
 		join( m_theSrcCollector );
 	}
 
@@ -1275,10 +1288,15 @@ void DeleteFilterThread::ExecuteThread( void )
 			inputQueue.getLocker().lock();
 			inputLocked = true;
 		}
-		if( inputQueue.wait(randomNumber(1000)) )
+		bool waited = false;
+		if( (inputQueue.size()>0) || (waited=inputQueue.wait(2000))==true )
 		{
+			doEnterFunctionEx(gakLogging::llDetail,"DeleteFilterThread::ExecuteThread::processor");
 			DirectoryEntry theDestFile = inputQueue.pop();
-			inputQueue.unlock();
+			if( waited )
+			{
+				inputQueue.unlock();
+			}
 
 			STRING theSourceFile = getDestFilePath(
 				theDestFile.fileName, destination, m_sourcePath
@@ -1342,7 +1360,8 @@ void CopyThread::ExecuteThread()
 			copyQueue.getLocker().lock();
 			inputLocked = true;
 		}
-		if( copyQueue.wait(randomNumber(1000)) )
+		bool waited = false;
+		if( (copyQueue.size()>0) || (waited=copyQueue.wait(2000))==true )
 		{
 			if( !m_startTick )
 			{
@@ -1350,7 +1369,10 @@ void CopyThread::ExecuteThread()
 			}
 
 			DirectoryEntry	theSourceFile = copyQueue.pop();
-			copyQueue.unlock();
+			if( waited )
+			{
+				copyQueue.unlock();
+			}
 
 			STRING theDestFile = getDestFilePath(
 				theSourceFile.fileName, source, destination
@@ -1521,10 +1543,14 @@ void DeleteThread::ExecuteThread()
 			deleteQueue.getLocker().lock();
 			inputLocked = true;
 		}
-		if( deleteQueue.wait(randomNumber(1000)) )
+		bool waited;
+		if( (deleteQueue.size()>0) || (waited=deleteQueue.wait(2000))==true )
 		{
 			DirectoryEntry theDestFile = deleteQueue.pop();
-			deleteQueue.unlock();
+			if( waited )
+			{
+				deleteQueue.unlock();
+			}
 
 			if( isDirectory( theDestFile.fileName ) )
 			{
@@ -1637,7 +1663,9 @@ int main( int , const char *argv[] )
 {
 	int result = EXIT_FAILURE;
 
-	doEnableLogEx(gakLogging::llInfo);
+	doDisableLog();
+	//doEnableLogEx(gakLogging::llInfo);
+	doEnableProfile(gakLogging::llDetail);
 	doImmediateLog();
 	doEnterFunctionEx(gakLogging::llInfo,"main");
 
