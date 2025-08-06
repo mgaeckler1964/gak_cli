@@ -1097,6 +1097,7 @@ void CopyFilterThread::ExecuteThread( void )
 
 	if( m_theDstCollector )
 	{
+		doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::join");
 		join( m_theDstCollector );
 	}
 
@@ -1115,7 +1116,7 @@ void CopyFilterThread::ExecuteThread( void )
 		bool waited = false;
 		if( (inputQueue.size()>0) || (waited=inputQueue.pwait(2000))==true )
 		{
-			doEnterFunctionEx(gakLogging::llInfo,"CopyFilterThread::ExecuteThread::processor");
+			doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::processor");
 			addFile = false;
 			reason = (const char *)NULL;
 			DirectoryEntry theSourceEntry = inputQueue.pop();
@@ -1131,7 +1132,7 @@ void CopyFilterThread::ExecuteThread( void )
 
 			if( m_theDstCollector )
 			{
-				doEnterFunctionEx(gakLogging::llInfo,"CopyFilterThread::ExecuteThread::findElement");
+				doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::findElement");
 				const DirectoryEntry *tmp = m_theDstCollector->findElement( theDestFile );
 				if( tmp )
 				{
@@ -1144,7 +1145,7 @@ void CopyFilterThread::ExecuteThread( void )
 			}
 			else
 			{
-				doEnterFunctionEx(gakLogging::llInfo,"CopyFilterThread::ExecuteThread::findFile");
+				doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::findFile");
 				theDestEntry.findFile( theDestFile );
 			}
 
@@ -1161,7 +1162,7 @@ void CopyFilterThread::ExecuteThread( void )
 			}
 			else
 			{
-				doEnterFunctionEx(gakLogging::llInfo,"CopyFilterThread::ExecuteThread::check");
+				doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::check");
 				if( addFile
 				|| theSourceEntry.fileSize != theDestEntry.fileSize
 				|| abs(
@@ -1251,7 +1252,7 @@ void CopyFilterThread::ExecuteThread( void )
 #ifdef _Windows
 				else if( m_archiveMode )
 				{
-					doEnterFunctionEx(gakLogging::llInfo,"CopyFilterThread::ExecuteThread::m_archiveMode");
+					doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::m_archiveMode");
 					unsigned long attr = GetFileAttributes( theSourceFile );
 					if( attr & FILE_ATTRIBUTE_ARCHIVE )
 					{
@@ -1276,6 +1277,7 @@ void DeleteFilterThread::ExecuteThread( void )
 
 	if( m_theSrcCollector )
 	{
+		doEnterFunctionEx(gakLogging::llDetail,"DeleteFilterThread::ExecuteThread::join");
 		join( m_theSrcCollector );
 	}
 
@@ -1289,6 +1291,7 @@ void DeleteFilterThread::ExecuteThread( void )
 		bool waited = false;
 		if( (inputQueue.size()>0) || (waited=inputQueue.wait(2000))==true )
 		{
+			doEnterFunctionEx(gakLogging::llDetail,"DeleteFilterThread::ExecuteThread::processor");
 			DirectoryEntry theDestFile = inputQueue.pop();
 			if( waited )
 			{
@@ -1662,7 +1665,7 @@ int main( int , const char *argv[] )
 
 	doDisableLog();
 	//doEnableLogEx(gakLogging::llInfo);
-	doEnableProfile(gakLogging::llInfo);
+	doEnableProfile(gakLogging::llDetail);
 	doImmediateLog();
 	doEnterFunctionEx(gakLogging::llInfo,"main");
 
