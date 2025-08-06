@@ -1253,9 +1253,9 @@ void CopyFilterThread::ExecuteThread( void )
 				else if( m_archiveMode )
 				{
 					doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::m_archiveMode");
-					unsigned long attr = GetFileAttributes( theSourceFile );
-					if( attr & FILE_ATTRIBUTE_ARCHIVE )
+					if( theSourceEntry.needBackup )
 					{
+						unsigned long attr = GetFileAttributes( theSourceFile );
 						attr &= ~FILE_ATTRIBUTE_ARCHIVE;
 						SetFileAttributes( theSourceFile, attr );
 					}
