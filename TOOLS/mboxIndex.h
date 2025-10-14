@@ -119,11 +119,11 @@ struct MailAddress
 	}
 };
 
-typedef gak::Index<size_t>			MboxIndex;
-typedef gak::Index<MailAddress>		MailIndex;
-typedef MboxIndex::SearchResult		MboxSearchResult;
-typedef MailIndex::SearchResult		MailSearchResult;
-typedef MailIndex::RelevantHits		MailRelevantHits;
+typedef gak::ai::Index<size_t>			MboxIndex;
+typedef gak::ai::Index<MailAddress>		MailIndex;
+typedef MboxIndex::SearchResult			MboxSearchResult;
+typedef MailIndex::SearchResult			MailSearchResult;
+typedef MailIndex::RelevantHits			MailRelevantHits;
 
 // --------------------------------------------------------------------- //
 // ----- class definitions --------------------------------------------- //
