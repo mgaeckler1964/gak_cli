@@ -41,6 +41,7 @@
 #include <iomanip>
 
 #include <gak/datetime.h>
+#include <gak/stringStream.h>
 
 // --------------------------------------------------------------------- //
 // ----- imported datas ------------------------------------------------ //
@@ -60,9 +61,6 @@
 // --------------------------------------------------------------------- //
 // ----- constants ----------------------------------------------------- //
 // --------------------------------------------------------------------- //
-
-// used to overwrite a longer line from a previous loop
-#define LINE_TAIL	"                "
 
 // --------------------------------------------------------------------- //
 // ----- macros -------------------------------------------------------- //
@@ -118,20 +116,26 @@ const char *seasons[] =
 // --------------------------------------------------------------------- //
 
 template <std::time_t UNIT_SECCONDS, int UNIT_IDX> 
-std::time_t showUnit( std::time_t secondsLeft )
+std::time_t showUnit( std::ostream &out, std::time_t secondsLeft )
 {
 	if( secondsLeft >= UNIT_SECCONDS )
 	{
 		std::time_t unit = secondsLeft / UNIT_SECCONDS;
 		secondsLeft -= unit*UNIT_SECCONDS;
-		std::cout << unit << (unit==1?stimeUnits:ptimeUnits)[UNIT_IDX];
+		out << unit << (unit==1?stimeUnits:ptimeUnits)[UNIT_IDX];
 	}
 
 	return secondsLeft;
 }
 
-static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *eventName )
+static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *eventName, std::size_t *previousLen )
 {
+	doEnterFunctionEx(gakLogging::llInfo, "showTimeLeft");
+	doLogValueEx(gakLogging::llInfo, eventName );
+
+	gak::STRING outStr;
+	gak::oSTRINGstream	out(outStr);
+
 	std::time_t secondsEvent = event.getUtcUnixSeconds();
 	std::time_t secondsNow = now.getUtcUnixSeconds();
 	std::time_t secondsLeft;
@@ -147,45 +151,64 @@ static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *ev
 		future = false;
 	}
 
-	secondsLeft = showUnit<SECONDS_PER_WEEK, 0>(secondsLeft);
-	secondsLeft = showUnit<SECONDS_PER_DAY, 1>(secondsLeft);
-	secondsLeft = showUnit<SECONDS_PER_HOUR, 2>(secondsLeft);
-	secondsLeft = showUnit<SECONDS_PER_MINUTE, 3>(secondsLeft);
-	secondsLeft = showUnit<1, 4>(secondsLeft);
+	secondsLeft = showUnit<SECONDS_PER_WEEK, 0>(out, secondsLeft);
+	secondsLeft = showUnit<SECONDS_PER_DAY, 1>(out, secondsLeft);
+	secondsLeft = showUnit<SECONDS_PER_HOUR, 2>(out, secondsLeft);
+	secondsLeft = showUnit<SECONDS_PER_MINUTE, 3>(out, secondsLeft);
+	secondsLeft = showUnit<1, 4>(out, secondsLeft);
 
-	std::cout << (future ? "bis zum n" OEM_ae "chsten "	// nächsten
+	out << (future ? "bis zum n" OEM_ae "chsten "	// nächsten
 						 : "seit letzten ")
-		<< eventName << LINE_TAIL << std::endl;
+		<< eventName;
+	out.flush();
+	std::cout << outStr;
+	size_t oldLen = *previousLen;
+	size_t lineLen = outStr.size();
+
+	doLogValueEx(gakLogging::llInfo, outStr );
+	doLogValueEx(gakLogging::llInfo, oldLen );
+	doLogValueEx(gakLogging::llInfo, lineLen );
+
+	*previousLen = lineLen;
+	for( size_t i=lineLen; i<oldLen; ++i )
+	{
+		std::cout << ' ';
+	}
+	std::cout << std::endl;
 }
 
 static void season()
 {
+	doEnterFunctionEx(gakLogging::llInfo, "season");
+	static gak::PODarray<std::size_t>	s_lineLens;
+
+	size_t line=0;
 	gak::DateTime now;
 	gak::DateTime::Season	season = now.getSeason();
 	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now << ' ' << seasons[season] << std::endl;
 
-	showTimeLeft( now, gak::DateTime::uptime(), "Rechnerstart" );
+	showTimeLeft( now, gak::DateTime::uptime(), "Rechnerstart", &s_lineLens[line++] );
 
 	gak::DateTime	nextSpring = now.nextSpring();
 	gak::DateTime	nextSummer = now.nextSummer();
 	if (nextSpring < nextSummer )
 	{
-		showTimeLeft( now, nextSpring, "Fr\x81hling" );		// Frühling
-		showTimeLeft( now, nextSummer, "Sommer" );
+		showTimeLeft( now, nextSpring, "Fr\x81hling", &s_lineLens[line++] );		// Frühling
+		showTimeLeft( now, nextSummer, "Sommer", &s_lineLens[line++] );
 	}
 	else
 	{
-		showTimeLeft( now, nextSummer, "Sommer" );
-		showTimeLeft( now, nextSpring, "Fr\x81hling" );		// Frühling
+		showTimeLeft( now, nextSummer, "Sommer", &s_lineLens[line++] );
+		showTimeLeft( now, nextSpring, "Fr\x81hling", &s_lineLens[line++] );		// Frühling
 	}
 
 	if( season == gak::DateTime::S_SUMMER )
 	{
-		showTimeLeft( now, now.nextAutumn(), "Herbst" );
+		showTimeLeft( now, now.nextAutumn(), "Herbst", &s_lineLens[line++] );
 	}
 	else if( season == gak::DateTime::S_AUTUMN )
 	{
-		showTimeLeft( now, now.nextWinter(), "Winter" );
+		showTimeLeft( now, now.nextWinter(), "Winter", &s_lineLens[line++] );
 	}
 
 	gak::DateTime	nextFullMoon = now.nextFullMoon();
@@ -193,17 +216,17 @@ static void season()
 	std::time_t	moonLevelTime;
 	if (nextFullMoon < nextNewMoon )
 	{
-		showTimeLeft( now, nextFullMoon, "Vollmond" );
-		showTimeLeft( now, nextNewMoon, "Neumond" );
-		showTimeLeft( now, now.lastNewMoon(), "Neumond" );
+		showTimeLeft( now, nextFullMoon, "Vollmond", &s_lineLens[line++] );
+		showTimeLeft( now, nextNewMoon, "Neumond", &s_lineLens[line++] );
+		showTimeLeft( now, now.lastNewMoon(), "Neumond", &s_lineLens[line++] );
 
 		moonLevelTime = gak::AVG_MOON_PHASE2 - (nextFullMoon.getUtcUnixSeconds() - now.getUtcUnixSeconds());
 	}
 	else
 	{
-		showTimeLeft( now, nextNewMoon, "Neumond" );
-		showTimeLeft( now, nextFullMoon, "Vollmond" );
-		showTimeLeft( now, now.lastFullMoon(), "Vollmond" );
+		showTimeLeft( now, nextNewMoon, "Neumond", &s_lineLens[line++] );
+		showTimeLeft( now, nextFullMoon, "Vollmond", &s_lineLens[line++] );
+		showTimeLeft( now, now.lastFullMoon(), "Vollmond", &s_lineLens[line++] );
 
 		moonLevelTime = nextNewMoon.getUtcUnixSeconds() - now.getUtcUnixSeconds();
 	}
@@ -245,15 +268,28 @@ static void season()
 
 int main()
 {
+	doEnableLogEx( gakLogging::llInfo );
+	//doDisableLog();
+	doEnterFunctionEx(gakLogging::llInfo, "main");
 #ifdef __WINDOWS__
 	system("cls");
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	COORD coord = { 0,0 };
+#ifndef NDEBUG
+	for( int i=0; i<7; ++i )
+#else
 	while( 1 )
+#endif
 	{
 		SetConsoleCursorPosition( hConsole, coord );
 		season();
+#if 0
+		gak::DateTime now;
+		unsigned sec = now.getSecond();
+		Sleep( (10 - sec%10) *1000 );
+#else
 		Sleep( 10000 );
+#endif
 	}
 #else
 	season();
