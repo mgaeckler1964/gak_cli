@@ -213,24 +213,33 @@ static void season()
 
 	gak::DateTime	nextFullMoon = now.nextFullMoon();
 	gak::DateTime	nextNewMoon = now.nextNewMoon();
-	std::time_t	moonLevelTime;
+	std::time_t		next, last, moonLevelTime;
 	if (nextFullMoon < nextNewMoon )
 	{
+		gak::DateTime	lastNewMoon = now.lastNewMoon();
 		showTimeLeft( now, nextFullMoon, "Vollmond", &s_lineLens[line++] );
 		showTimeLeft( now, nextNewMoon, "Neumond", &s_lineLens[line++] );
-		showTimeLeft( now, now.lastNewMoon(), "Neumond", &s_lineLens[line++] );
+		showTimeLeft( now, lastNewMoon, "Neumond", &s_lineLens[line++] );
 
-		moonLevelTime = gak::AVG_MOON_PHASE2 - (nextFullMoon.getUtcUnixSeconds() - now.getUtcUnixSeconds());
+		next = nextFullMoon.getUtcUnixSeconds();
+		last = lastNewMoon.getUtcUnixSeconds();
+
+		moonLevelTime = now.getUtcUnixSeconds() - last;
 	}
 	else
 	{
+		gak::DateTime	lastFullMoon = now.lastFullMoon();
 		showTimeLeft( now, nextNewMoon, "Neumond", &s_lineLens[line++] );
 		showTimeLeft( now, nextFullMoon, "Vollmond", &s_lineLens[line++] );
-		showTimeLeft( now, now.lastFullMoon(), "Vollmond", &s_lineLens[line++] );
+		showTimeLeft( now, lastFullMoon, "Vollmond", &s_lineLens[line++] );
 
-		moonLevelTime = nextNewMoon.getUtcUnixSeconds() - now.getUtcUnixSeconds();
+		next = nextNewMoon.getUtcUnixSeconds();
+		last = lastFullMoon.getUtcUnixSeconds();
+
+		moonLevelTime = next - now.getUtcUnixSeconds();
 	}
-	int moonPercent = int(moonLevelTime*100.0/(gak::AVG_MOON_PHASE2) +0.5);
+	time_t	fullPhase = next-last;
+	int		moonPercent = int(100.0*moonLevelTime/fullPhase +0.5);
 	std::cout << moonPercent << "% Mondphase   " << std::endl;
 }
 
