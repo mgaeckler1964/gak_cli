@@ -185,7 +185,7 @@ static void season()
 	size_t line=0;
 	gak::DateTime now;
 	gak::DateTime::Season	season = now.getSeason();
-	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now << ' ' << seasons[season] << std::endl;
+	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now << ' ' << seasons[season] << "     " << std::endl;
 
 	showTimeLeft( now, gak::DateTime::uptime(), "Rechnerstart", &s_lineLens[line++] );
 
