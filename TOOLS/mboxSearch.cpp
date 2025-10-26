@@ -77,10 +77,12 @@ using namespace gak;
 static const int FLAG_INDEX_PATH	= 0x010;
 static const int FLAG_BRAIN_PATH	= 0x020;
 static const int FLAG_MBOX_PATH		= 0x040;
+static const int FLAG_STATISTICS	= 0x080;
 
 static const char CHAR_INDEX_PATH	= 'I';
 static const char CHAR_BRAIN_PATH	= 'B';
 static const char CHAR_MBOX_PATH	= 'M';
+static const char CHAR_STATISTICS	= 'S';
 
 // --------------------------------------------------------------------- //
 // ----- macros -------------------------------------------------------- //
@@ -91,7 +93,7 @@ static const char CHAR_MBOX_PATH	= 'M';
 // --------------------------------------------------------------------- //
 
 using mail::Mails;
-using ai::AiBrain;
+using ai::Brain;
 
 // --------------------------------------------------------------------- //
 // ----- class definitions --------------------------------------------- //
@@ -108,9 +110,10 @@ using ai::AiBrain;
 
 static gak::CommandLine::Options options[] =
 {
-	{ CHAR_INDEX_PATH,	"indexPath",	0, 1, FLAG_INDEX_PATH|gak::CommandLine::needArg, "path where to find the index" },
-	{ CHAR_BRAIN_PATH,	"brainPath",	0, 1, FLAG_BRAIN_PATH|gak::CommandLine::needArg, "path where to store the AI brain" },
-	{ CHAR_MBOX_PATH,	"mboxPath",		0, -1, FLAG_MBOX_PATH|gak::CommandLine::needArg, "path where to find the mbox files" },
+	{ CHAR_INDEX_PATH,	"indexPath",	0, 1, FLAG_INDEX_PATH|gak::CommandLine::needArg,	"path where to find the index" },
+	{ CHAR_BRAIN_PATH,	"brainPath",	0, 1, FLAG_BRAIN_PATH|gak::CommandLine::needArg,	"path where to store the AI brain" },
+	{ CHAR_MBOX_PATH,	"mboxPath",		0, -1, FLAG_MBOX_PATH|gak::CommandLine::needArg,	"path where to find the mbox files" },
+	{ CHAR_STATISTICS,	"showStats",	0, 1, FLAG_STATISTICS,								"show statistics" },
 	{ 0 }
 };
 
@@ -126,14 +129,16 @@ static gak::CommandLine::Options options[] =
 // ----- module functions ---------------------------------------------- //
 // --------------------------------------------------------------------- //
 
+// -B X:\MailIndex -S
 // -B X:\MailIndex demon force BikeFeeling
+// -B C:\TEMP\gak\Index -S
 // -B C:\TEMP\gak\Index demon force BikeFeeling
 // -B C:\TEMP\gak\Index demon force BikeFeeling Webspace Ablauf Domain
 static void aiSearch( const gak::CommandLine &cmdLine )
 {
 	doEnterFunctionEx(gakLogging::llInfo, "aiSearch");
 
-	AiBrain brain;
+	Brain brain;
 
 	STRING brainFile = cmdLine.parameter[CHAR_BRAIN_PATH][0];
 	brainFile.condAppend(DIRECTORY_DELIMITER);
@@ -145,7 +150,7 @@ static void aiSearch( const gak::CommandLine &cmdLine )
 	std::cout << "Searching in " << brainFile << std::endl;
 	Set<STRING> result;
 	const char *argv;
-	for( int i=1; (argv = cmdLine.argv[i]) != NULL; ++i )
+	for( int i=1; (argv = cmdLine.argv[i]) != nullptr; ++i )
 	{
 		char c = *argv;
 		if( c != '-' && c != '+' )
@@ -155,7 +160,7 @@ static void aiSearch( const gak::CommandLine &cmdLine )
 			mergeSet(&result, partners);
 		}
 	}
-	for( int i=1; (argv = cmdLine.argv[i]) != NULL; ++i )
+	for( int i=1; (argv = cmdLine.argv[i]) != nullptr; ++i )
 	{
 		char c = *argv;
 		if( c == '+' )
@@ -168,7 +173,7 @@ static void aiSearch( const gak::CommandLine &cmdLine )
 			result.moveFrom( tmpResult );
 		}
 	}
-	for( int i=1; (argv = cmdLine.argv[i]) != NULL; ++i )
+	for( int i=1; (argv = cmdLine.argv[i]) != nullptr; ++i )
 	{
 		char c = *argv;
 		if( c == '-' )
@@ -188,9 +193,30 @@ static void aiSearch( const gak::CommandLine &cmdLine )
 	{
 		std::cout << '\t' << *it  << std::endl;
 	}
+
+	if( cmdLine.flags &FLAG_STATISTICS ) 
+	{
+		ai::BrainCountIdx nodes;
+		brain.getCounterArray(&nodes);
+		
+		size_t i=0;
+		for(
+			ai::BrainCountIdx::const_reverse_iterator it = nodes.crbegin();
+			i<20 && i<nodes.size(); 
+			++i, ++it )
+		{
+			std::cout << it->node->count;
+			for( size_t j=0; j<3 && j<it->node->words.size(); ++j )
+			{
+				std::cout << ' ' << it->node->words[j];
+			}
+			std::cout << std::endl;
+		}
+	}
 }
 
 // -I X:\MailIndex -M X:\Mail -M W:\Mail "demon +force" BikeFeeling
+// -I X:\MailIndex -M X:\Mail -M W:\Mail -S
 static void indexSearch( const gak::CommandLine &cmdLine )
 {
 	doEnterFunctionEx(gakLogging::llInfo, "indexSearch");
@@ -211,7 +237,7 @@ static void indexSearch( const gak::CommandLine &cmdLine )
 	std::cout << "Searching in " << indexFile << std::endl;
 
 	const char *argv;
-	for( int i=1; (argv = cmdLine.argv[i]) != NULL; ++i )
+	for( int i=1; (argv = cmdLine.argv[i]) != nullptr; ++i )
 	{
 		std::cout << "\nSearching for " << argv << std::endl;
 		MailRelevantHits	result = index.getRelevantHits(argv, false, true, false);
@@ -265,6 +291,24 @@ static void indexSearch( const gak::CommandLine &cmdLine )
 			}
 		}
 	}
+
+	if( cmdLine.flags &FLAG_STATISTICS ) 
+	{
+		ai::StatistikData stats = index.getStatistik();
+		size_t i=0;
+		for(
+			ai::StatistikData::const_iterator it = stats.cbegin(), endIT = stats.cend();
+			it != endIT && i<10;
+			++it
+		)
+		{
+			if( !ai::isSpecialIndex(it->m_word) )
+			{
+				std::cout << it->m_count << ' ' << it->m_word << std::endl;
+				++i;
+			}
+		}
+	}
 }
 
 static void mboxSearch( const gak::CommandLine &cmdLine )
@@ -272,7 +316,7 @@ static void mboxSearch( const gak::CommandLine &cmdLine )
 	doEnterFunctionEx(gakLogging::llInfo, "mboxSearch");
 	if( (cmdLine.flags & (FLAG_INDEX_PATH|FLAG_BRAIN_PATH)) == (FLAG_INDEX_PATH|FLAG_BRAIN_PATH) )
 	{
-		throw CmdlineError("Both index and brain path are not allows.");
+		throw CmdlineError("Both index and brain path are not allowed.");
 	}
 	if((cmdLine.flags & (FLAG_INDEX_PATH|FLAG_BRAIN_PATH)) == 0)
 	{

@@ -29,6 +29,10 @@
 		SUCH DAMAGE.
 */
 
+/*
+	command lines:
+	-D 5 -T 32 X:\Mail\Onlinedienste -I C:\TEMP\gak\Index -B C:\TEMP\gak\Index -S X:\MailIndex\stopword.txt
+*/
 
 // --------------------------------------------------------------------- //
 // ----- switches ------------------------------------------------------ //
@@ -187,7 +191,7 @@ struct ProcessorType<STRING>
 	static int				s_flags;
 
 	static Locker			s_locker;
-	static AiBrain			s_Brain;
+	static Brain			s_Brain;
 	static bool				s_changed;
 	static STRING			s_brainFile;
 	static size_t			s_wordDistance;
@@ -365,7 +369,7 @@ Set<CI_STRING>	ProcessorType<STRING>::s_stopWords;
 STRING			ProcessorType<STRING>::s_arg;
 STRING			ProcessorType<STRING>::s_indexPath;
 Locker			ProcessorType<STRING>::s_locker;
-AiBrain			ProcessorType<STRING>::s_Brain;
+Brain			ProcessorType<STRING>::s_Brain;
 bool			ProcessorType<STRING>::s_changed = false;
 STRING			ProcessorType<STRING>::s_brainFile;
 int				ProcessorType<STRING>::s_flags = 0;
@@ -410,7 +414,7 @@ static int mboxIndexer( const CommandLine &cmdLine )
 		readFromBinaryFile( indexFile, &index, MAIL_INDEX_MAGIC, MAIL_INDEX_VERSION, false );
 	}
 
-	AiBrain &brain = ProcessorType<STRING>::s_Brain;
+	Brain &brain = ProcessorType<STRING>::s_Brain;
 	const STRING &brainFile = ProcessorType<STRING>::s_brainFile;
 	if( cmdLine.flags & OPT_BRAIN_PATH && !(cmdLine.flags&FLAG_FORCE) && !strAccess( brainFile, 0 ))
 	{
