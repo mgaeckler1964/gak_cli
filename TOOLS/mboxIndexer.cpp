@@ -32,6 +32,8 @@
 /*
 	command lines:
 	-D 5 -T 32 X:\Mail\Onlinedienste -I C:\TEMP\gak\Index -B C:\TEMP\gak\Index -S X:\MailIndex\stopword.txt
+	-D 5 -T 32 X:\Mail\Newsletter -I C:\TEMP\gak\Index -B C:\TEMP\gak\Index -S X:\MailIndex\stopword.txt
+	-D 5 -B X:\MailIndex -i X:\MailIndex -s X:\MailIndex\stopword.txt -m X:\Mail W:\mail\gak
 */
 
 // --------------------------------------------------------------------- //

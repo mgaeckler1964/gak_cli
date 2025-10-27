@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="chess.cpp" />
+    <ClCompile Include="clichess.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{260D2647-C91F-4471-B0B1-3D71C1EBA260}</ProjectGuid>

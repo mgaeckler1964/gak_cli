@@ -51,7 +51,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mboxIndexer", "TOOLS\mboxIn
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mboxSearch", "TOOLS\mboxSearch.vcxproj", "{F1A83950-469C-46F7-B242-81D6DB53587B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "chess", "TOOLS\chess.vcxproj", "{260D2647-C91F-4471-B0B1-3D71C1EBA260}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "clichess", "TOOLS\clichess.vcxproj", "{260D2647-C91F-4471-B0B1-3D71C1EBA260}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

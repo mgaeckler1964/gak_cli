@@ -1,7 +1,7 @@
 /*
-		Project:		
-		Module:			
-		Description:	
+		Project:		GAK_CLI
+		Module:			clichess.cpp
+		Description:	A chess engine with command line interface (CLI)
 		Author:			Martin Gäckler
 		Address:		Hofmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/
