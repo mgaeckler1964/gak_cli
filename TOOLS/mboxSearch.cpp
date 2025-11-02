@@ -15,7 +15,7 @@
 		You should have received a copy of the GNU General Public License 
 		along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Austria, Linz ``AS IS''
+		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Linz, Austria ``AS IS''
 		AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
 		TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
 		PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR
@@ -294,7 +294,8 @@ static void indexSearch( const gak::CommandLine &cmdLine )
 
 	if( cmdLine.flags &FLAG_STATISTICS ) 
 	{
-		ai::StatistikData stats = index.getStatistik();
+		ai::StatistikData stats;
+		index.getStatistik(&stats);
 		size_t i=0;
 		for(
 			ai::StatistikData::const_iterator it = stats.cbegin(), endIT = stats.cend();

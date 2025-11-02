@@ -15,7 +15,7 @@
 		You should have received a copy of the GNU General Public License 
 		along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Austria, Linz ``AS IS''
+		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Linz, Austria ``AS IS''
 		AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
 		TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
 		PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR
@@ -31,9 +31,25 @@
 
 /*
 	command lines:
-	-D 5 -T 32 X:\Mail\Onlinedienste -I C:\TEMP\gak\Index -B C:\TEMP\gak\Index -S X:\MailIndex\stopword.txt
-	-D 5 -T 32 X:\Mail\Newsletter -I C:\TEMP\gak\Index -B C:\TEMP\gak\Index -S X:\MailIndex\stopword.txt
-	-D 5 -B X:\MailIndex -i X:\MailIndex -s X:\MailIndex\stopword.txt -m X:\Mail W:\mail\gak
+	-F -D 5 -T 5 X:\Mail\Onlinedienste -I C:\TEMP\gak\Index -B C:\TEMP\gak\Index -S X:\MailIndex\stopword.txt
+	-F -D 5 -T 1 X:\Mail\Newsletter -I C:\TEMP\gak\Index -B C:\TEMP\gak\Index -S X:\MailIndex\stopword.txt
+	-F -D 5 -T 1 X:\Mail\Archiv -I C:\TEMP\gak\Index -B C:\TEMP\gak\Index -S X:\MailIndex\stopword.txt
+
+	-D 5 -T 32 -I C:\TEMP\gak\Index -B C:\TEMP\gak\Index -S X:\MailIndex\stopword.txt X:\Mail\Onlinedienste
+	-D 5 -T 32 -I C:\TEMP\gak\Index -B C:\TEMP\gak\Index -S X:\MailIndex\stopword.txt X:\Mail\Newsletter 
+
+
+	Index the entire mails and learn from it in the temp drive with the main thread:force 
+	-FM -D 5 -T 0 -B C:\TEMP\gak\Index -i C:\TEMP\gak\Index -s X:\MailIndex\stopword.txt X:\Mail W:\mail\gak
+
+	force Index the entire mails and learn from it in the temp drive with one background thread per pool:
+	-FM -D 5 -T 1 -B C:\TEMP\gak\Index -i C:\TEMP\gak\Index -s X:\MailIndex\stopword.txt X:\Mail W:\mail\gak
+
+	force index all mails but no brain
+	-FM -D 5 -T 1 -i X:\MailIndex -s X:\MailIndex\stopword.txt X:\Mail W:\mail\gak
+
+	Force Index the entire mails and learn from it in the network:
+	-FM -D 5 -T 1 -B X:\MailIndex -i X:\MailIndex -s X:\MailIndex\stopword.txt X:\Mail W:\mail\gak
 */
 
 // --------------------------------------------------------------------- //
@@ -115,37 +131,25 @@ static const size_t DEF_WORD_DISTANCE = 3UL;
 // ----- class definitions --------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-static void showProgress( size_t idx, size_t max )
-{
-	static Locker		s_locker;
-	static StopWatch	s_watch(true);
+typedef SharedPointer<StringIndex> StringIndexPtr;
 
-	if( s_watch.getMillis() > 1000 )
-	{
-		LockGuard guard( s_locker );
-		if( guard )
-		{
-			if( s_watch.getMillis() > 1000 )
-			{
-				std::cout << idx << '/' << max << "     \r";
-				s_watch.start();
-			}
-		}
-	}
+inline StringIndexPtr createStringIndex()
+{
+	return StringIndexPtr::makeShared();
 }
 
 struct MailIndexerCmd
 {
-	STRING		theName;
-	size_t		idx;
-	StringIndex	index;
+	STRING			mboxFile;
+	size_t			idx;
+	StringIndexPtr	index;
 	
-	MailIndexerCmd(const STRING &theName, size_t idx, const StringIndex &index) : theName(theName),idx(idx), index(index) {}
+	MailIndexerCmd(const STRING &theName, size_t idx, const StringIndexPtr &index) : mboxFile(theName),idx(idx), index(index) {}
 };
 
 typedef SharedPointer<MailIndexerCmd> MailIndexerPtr;
 
-inline MailIndexerPtr createIndexerCmd(const STRING &theName, size_t idx, const StringIndex &index)
+inline MailIndexerPtr createIndexerCmd(const STRING &theName, size_t idx, const StringIndexPtr &index)
 {
 	return MailIndexerPtr::makeShared(theName, idx, index);
 }
@@ -157,17 +161,17 @@ struct ProcessorType<MailIndexerPtr>
 
 	static MailIndex		s_mailIndex;
 	static bool				s_changed;
-	static Locker			s_locker;
+	static Locker			s_mailIndexLocker;
 
 	void process( const MailIndexerPtr &ptr )
 	{
 		doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<MailIndexerCmd>::mergeIndex");
-		LockGuard guard( s_locker );
+		LockGuard guard( s_mailIndexLocker );
 
 		if( guard )
 		{
 			const MailIndexerCmd &cmd = *ptr;
-			s_mailIndex.mergeIndexPositions( MailAddress(cmd.theName, cmd.idx), cmd.index );
+			s_mailIndex.mergeIndexPositions( MailAddress(cmd.mboxFile, cmd.idx), *cmd.index );
 			s_changed = true;
 		}
 		else
@@ -178,7 +182,7 @@ struct ProcessorType<MailIndexerPtr>
 };
 
 
-static ThreadPool<MailIndexerPtr>	*g_IndexerPool=NULL;
+static ThreadPool<MailIndexerPtr>	*g_IndexerPool=nullptr;
 
 template <>
 struct ProcessorType<STRING>
@@ -192,7 +196,7 @@ struct ProcessorType<STRING>
 
 	static int				s_flags;
 
-	static Locker			s_locker;
+	static Locker			s_brainLocker;
 	static Brain			s_Brain;
 	static bool				s_changed;
 	static STRING			s_brainFile;
@@ -223,12 +227,18 @@ struct ProcessorType<STRING>
 			fp << s_stopWords;
 			fp.close();
 		}
-		s_indexPath = cmdLine.parameter[CHAR_INDEX_PATH][0];
-		s_indexPath.condAppend(DIRECTORY_DELIMITER);
+		if( cmdLine.flags & OPT_INDEX_PATH )
+		{
+			s_indexPath = cmdLine.parameter[CHAR_INDEX_PATH][0];
+			s_indexPath.condAppend(DIRECTORY_DELIMITER);
+		}
 
-		s_brainFile = cmdLine.parameter[CHAR_BRAIN_PATH][0];
-		s_brainFile.condAppend(DIRECTORY_DELIMITER);
-		s_brainFile += BRAIN_FILE;
+		if( cmdLine.flags & OPT_BRAIN_PATH )
+		{
+			s_brainFile = cmdLine.parameter[CHAR_BRAIN_PATH][0];
+			s_brainFile.condAppend(DIRECTORY_DELIMITER);
+			s_brainFile += BRAIN_FILE;
+		}
 
 		s_flags = cmdLine.flags;
 		if( cmdLine.flags & OPT_WORD_DISTANCE )
@@ -251,7 +261,7 @@ struct ProcessorType<STRING>
 		doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<STRING>::process");
 		doLogValueEx( gakLogging::llInfo, file );
 
-		F_STRING	theName;
+		F_STRING	mboxFile;
 		STRING		indexFile;
 		STRING		posFile;
 		size_t		idx=0;
@@ -261,14 +271,14 @@ struct ProcessorType<STRING>
 		posFile = indexFile = s_indexPath;
 		if( !s_arg.isEmpty() )
 		{
-			theName = file.subString( s_arg.strlen() );
+			mboxFile = file.subString( s_arg.strlen() );
 		}
-		if( theName.isEmpty() )
+		if( mboxFile.isEmpty() )
 		{
-			fsplit(file, NULL, &theName);
+			fsplit(file, NULL, &mboxFile);
 		}
-		indexFile += theName + MBOX_INDEX_EXT;
-		posFile += theName + MBOX_POS_EXT;
+		indexFile += mboxFile + MBOX_INDEX_EXT;
+		posFile += mboxFile + MBOX_POS_EXT;
 
 		if( !(s_flags & FLAG_FORCE) && !strAccess(indexFile,0) && !strAccess(posFile,0) )
 		{
@@ -299,7 +309,7 @@ struct ProcessorType<STRING>
 		{
 			const MAIL &theMail = *it;
 			STRING text = theMail.extractPlainText();
-			if( !text.isEmpty() )
+			if( !text.isEmpty() && text.size() < 1024*1024 )	// do not process extra large mails
 			{
 				if( s_flags & FLAG_USE_META )
 				{
@@ -311,16 +321,18 @@ struct ProcessorType<STRING>
 					text += it->subject;
 					text += it->date.getOriginalTime();
 				}
-				StringTokens tokens = tokenString( text, s_stopWords );
-				StringIndex index = processPositions(text, tokens);
-				MailIndexerPtr cmd = createIndexerCmd(theName, idx, index);
+				StringTokens tokens;
+				StringIndexPtr index = createStringIndex();
+				tokenString( text, s_stopWords, IS_WORD, &tokens );
+				processPositions(text, tokens, index );
+				MailIndexerPtr cmd = createIndexerCmd(mboxFile, idx, index);
 				g_IndexerPool->process(cmd);
-				mboxIndex.mergeIndexPositions( idx, index );
+				mboxIndex.mergeIndexPositions( idx, *index );
 				doLogValueEx(gakLogging::llInfo, mboxIndex.size() );
 
 				if( s_flags & OPT_BRAIN_PATH )
 				{
-					LockGuard guard(s_locker);
+					LockGuard guard(s_brainLocker);
 					if( guard )
 					{
 						s_changed = true;
@@ -329,7 +341,7 @@ struct ProcessorType<STRING>
 				}
 			}
 			idx++;
-			showProgress( idx, theMails.size() );
+			gakLogging::doShowProgress( 'R', idx, theMails.size() );
 		}
 
 		std::cout << "writing: " << indexFile << std::endl;
@@ -370,7 +382,7 @@ size_t			ProcessorType<STRING>::s_mailCount = 0;
 Set<CI_STRING>	ProcessorType<STRING>::s_stopWords;
 STRING			ProcessorType<STRING>::s_arg;
 STRING			ProcessorType<STRING>::s_indexPath;
-Locker			ProcessorType<STRING>::s_locker;
+Locker			ProcessorType<STRING>::s_brainLocker;
 Brain			ProcessorType<STRING>::s_Brain;
 bool			ProcessorType<STRING>::s_changed = false;
 STRING			ProcessorType<STRING>::s_brainFile;
@@ -379,7 +391,7 @@ size_t			ProcessorType<STRING>::s_wordDistance = DEF_WORD_DISTANCE;
 
 MailIndex		ProcessorType<MailIndexerPtr>::s_mailIndex;
 bool			ProcessorType<MailIndexerPtr>::s_changed = false;
-Locker			ProcessorType<MailIndexerPtr>::s_locker;
+Locker			ProcessorType<MailIndexerPtr>::s_mailIndexLocker;
 
 
 // --------------------------------------------------------------------- //
@@ -399,11 +411,15 @@ static int mboxIndexer( const CommandLine &cmdLine )
 	if( cmdLine.flags & OPT_THREAD_COUNT )
 	{
 		threadCount = getValueE<size_t>(cmdLine.parameter[CHAR_THREAD_COUNT][0]);
+		/*
 		if( !threadCount )
 		{
 			threadCount = DEF_THREAD_COUNT;
 		}
+		*/
 	}
+	g_IndexerPool=new ThreadPool<MailIndexerPtr>(threadCount ? 1 : 0,"MailIndexer");
+
 	ParalelDirScanner	theScanner("mboxIndexer", cmdLine,threadCount);
 
 	ProcessorType<STRING>::init(cmdLine);
@@ -461,7 +477,8 @@ static int mboxIndexer( const CommandLine &cmdLine )
 		writeToBinaryFile( indexFile, index, MAIL_INDEX_MAGIC, MAIL_INDEX_VERSION, ovmShortDown );
 
 		std::cout << "Creating statistic" << std::endl;
-		StatistikData sd = index.getStatistik();
+		StatistikData sd;
+		index.getStatistik(&sd);
 		std::cout << "Writing statistic " << sd.size() << std::endl;
 		std::size_t count = 0;
 		std::ofstream	of(ProcessorType<STRING>::s_indexPath+"index.log" );
@@ -473,7 +490,7 @@ static int mboxIndexer( const CommandLine &cmdLine )
 		{
 			++count;
 			of << it->m_word << ' ' << it->m_count << '\n';
-			showProgress( count, sd.size() );
+			gakLogging::doShowProgress( 'I', count, sd.size() );
 		}
 		doLogPositionEx( gakLogging::llInfo );
 		sd.clear();
@@ -519,13 +536,15 @@ static int mboxIndexer( const CommandLine &cmdLine )
 
 int main( int , const char *argv[] )
 {
-	doEnableLogEx( gakLogging::llInfo );
+	StopWatch					stopWatch(true);
+	//doEnableLogEx( gakLogging::llInfo );
+	doDisableLog();
+	doEnableProfile(gakLogging::llInfo);
 	doEnterFunctionEx(gakLogging::llInfo, "main");
-
-	g_IndexerPool=new ThreadPool<MailIndexerPtr>(1,"MailIndexer");
 
 	int result = EXIT_FAILURE;
 
+	gakLogging::enableDefaultProgressShow();
 	try
 	{
 		CommandLine cmdLine( options, argv );
@@ -545,6 +564,8 @@ int main( int , const char *argv[] )
 		std::cerr << argv[0] << ": Unkown error" << std::endl;
 	}
 
+	std::cout << "Thank You for using indexer" << std::endl;
+	std::cout << stopWatch.get<Weeks<> >().toString() << std::endl;
 	return result;
 }
 
