@@ -64,6 +64,8 @@
 // ----- includes ------------------------------------------------------ //
 // --------------------------------------------------------------------- //
 
+#include <memory>
+
 #include <gak/threadDirScanner.h>
 #include <gak/cmdlineParser.h>
 #include <gak/numericString.h>
@@ -161,28 +163,20 @@ struct ProcessorType<MailIndexerPtr>
 
 	static MailIndex		s_mailIndex;
 	static bool				s_changed;
-	static Locker			s_mailIndexLocker;
+	static Critical			s_mailIndexCritical;
 
 	void process( const MailIndexerPtr &ptr )
 	{
 		doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<MailIndexerCmd>::mergeIndex");
-		LockGuard guard( s_mailIndexLocker );
+		CriticalScope scope( s_mailIndexCritical );
 
-		if( guard )
-		{
-			const MailIndexerCmd &cmd = *ptr;
-			s_mailIndex.mergeIndexPositions( MailAddress(cmd.mboxFile, cmd.idx), *cmd.index );
-			s_changed = true;
-		}
-		else
-		{
-			doLogMessageEx( gakLogging::llError, "Cannot lock" );
-		}
+		const MailIndexerCmd &cmd = *ptr;
+		s_mailIndex.mergeIndexPositions( MailAddress(cmd.mboxFile, cmd.idx), cmd.index );
+		s_changed = true;
 	}
 };
 
-
-static ThreadPool<MailIndexerPtr>	*g_IndexerPool=nullptr;
+static std::auto_ptr<ThreadPool<MailIndexerPtr>>	g_IndexerPool;
 
 template <>
 struct ProcessorType<STRING>
@@ -196,7 +190,7 @@ struct ProcessorType<STRING>
 
 	static int				s_flags;
 
-	static Locker			s_brainLocker;
+	static Critical			s_brainCritical;
 	static Brain			s_Brain;
 	static bool				s_changed;
 	static STRING			s_brainFile;
@@ -325,19 +319,19 @@ struct ProcessorType<STRING>
 				StringIndexPtr index = createStringIndex();
 				tokenString( text, s_stopWords, IS_WORD, &tokens );
 				processPositions(text, tokens, index );
-				MailIndexerPtr cmd = createIndexerCmd(mboxFile, idx, index);
-				g_IndexerPool->process(cmd);
-				mboxIndex.mergeIndexPositions( idx, *index );
+				StringIndex indexCpy = *index;
+				{
+					MailIndexerPtr cmd = createIndexerCmd(mboxFile, idx, index);
+					g_IndexerPool->process(cmd);
+				}
+				mboxIndex.mergeIndexPositions( idx, &indexCpy );
 				doLogValueEx(gakLogging::llInfo, mboxIndex.size() );
 
 				if( s_flags & OPT_BRAIN_PATH )
 				{
-					LockGuard guard(s_brainLocker);
-					if( guard )
-					{
-						s_changed = true;
-						s_Brain.learnFromTokens(text, tokens, s_wordDistance);
-					}
+					CriticalScope	scope( s_brainCritical );
+					s_changed = true;
+					s_Brain.learnFromTokens(text, tokens, s_wordDistance);
 				}
 			}
 			idx++;
@@ -350,7 +344,7 @@ struct ProcessorType<STRING>
 		std::cout << "writing: " << posFile << std::endl;
 		makePath(posFile);
 		writeToBinaryFile( posFile, positions, MBOX_POS_MAGIC, MBOX_POS_VERSION, ovmShortDown );
-		std::cout << "found: " << theMails.size() << '/' << s_mailCount << " int " << file << std::endl;
+		std::cout << "Processed " << file << ", found " << theMails.size() << '/' << s_mailCount << " mails."<< std::endl;
 	}
 };
 
@@ -382,7 +376,8 @@ size_t			ProcessorType<STRING>::s_mailCount = 0;
 Set<CI_STRING>	ProcessorType<STRING>::s_stopWords;
 STRING			ProcessorType<STRING>::s_arg;
 STRING			ProcessorType<STRING>::s_indexPath;
-Locker			ProcessorType<STRING>::s_brainLocker;
+Critical		ProcessorType<STRING>::s_brainCritical;
+
 Brain			ProcessorType<STRING>::s_Brain;
 bool			ProcessorType<STRING>::s_changed = false;
 STRING			ProcessorType<STRING>::s_brainFile;
@@ -391,7 +386,7 @@ size_t			ProcessorType<STRING>::s_wordDistance = DEF_WORD_DISTANCE;
 
 MailIndex		ProcessorType<MailIndexerPtr>::s_mailIndex;
 bool			ProcessorType<MailIndexerPtr>::s_changed = false;
-Locker			ProcessorType<MailIndexerPtr>::s_mailIndexLocker;
+Critical		ProcessorType<MailIndexerPtr>::s_mailIndexCritical;
 
 
 // --------------------------------------------------------------------- //
@@ -418,7 +413,7 @@ static int mboxIndexer( const CommandLine &cmdLine )
 		}
 		*/
 	}
-	g_IndexerPool=new ThreadPool<MailIndexerPtr>(threadCount ? 1 : 0,"MailIndexer");
+	g_IndexerPool.reset(new ThreadPool<MailIndexerPtr>(threadCount ? 1 : 0,"MailIndexer"));
 
 	ParalelDirScanner	theScanner("mboxIndexer", cmdLine,threadCount);
 
@@ -449,8 +444,12 @@ static int mboxIndexer( const CommandLine &cmdLine )
 	}
 	std::cout << "Mbox Indexer completed\nWaiting for full indexer " << g_IndexerPool->size() << std::endl;
 	g_IndexerPool->flush();
+	g_IndexerPool->shutdown();
+	g_IndexerPool.release();
 
-	std::cout << __FILE__ << __LINE__ << ' ' << ProcessorType<STRING>::s_stopWords.size() << std::endl;
+#ifndef NDEBUG
+	std::cout << __FILE__ << __LINE__ << " # stopwords " << ProcessorType<STRING>::s_stopWords.size() << std::endl;
+#endif
 	ProcessorType<STRING>::s_stopWords.clear();
 
 	doLogPositionEx( gakLogging::llInfo );
@@ -490,7 +489,9 @@ static int mboxIndexer( const CommandLine &cmdLine )
 		{
 			++count;
 			of << it->m_word << ' ' << it->m_count << '\n';
+#ifndef NDEBUG
 			gakLogging::doShowProgress( 'I', count, sd.size() );
+#endif
 		}
 		doLogPositionEx( gakLogging::llInfo );
 		sd.clear();
