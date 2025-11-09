@@ -146,8 +146,11 @@ static void showListing( int flags, const STRING &sort, const STRING &fPattern )
 		{
 			if( flags & (LONG_LIST|INODES|LINK_COUNT) )
 			{
-				std::cout << (it->directory ? 'd' : '-');
-				std::cout << (it->hidden    ? 'h' : '-');
+				std::cout << (it->directory		? 'd' : '-');
+				std::cout << (it->hidden		? 'h' : '-');
+				std::cout << (it->readOnly		? 'r' : 'w');
+				std::cout << (it->needBackup	? 'a' : '-');
+				std::cout << (it->reparsePoint	? 'p' : '-');
 				std::cout << ' ';
 
 				std::cout << std::setw( 25 ) << it->fileName.convertToTerminal().leftString(25) << ' ';
