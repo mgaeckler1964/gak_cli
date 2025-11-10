@@ -109,14 +109,16 @@ static const int OPT_BRAIN_PATH		= 0x080;
 static const int OPT_THREAD_COUNT	= 0x100;
 static const int FLAG_FORCE			= 0x200;
 static const int OPT_WORD_DISTANCE	= 0x400;
+static const int FLAG_BACK_IDX		= 0x800;
 
+static const char CHAR_BRAIN_PATH	= 'B';
+static const char CHAR_DISTANCE		= 'D';
+static const char CHAR_FORCE		= 'F';
+static const char CHAR_INDEX_PATH	= 'I';
 static const char CHAR_USE_META		= 'M';
 static const char CHAR_STOP_WORDS	= 'S';
-static const char CHAR_INDEX_PATH	= 'I';
-static const char CHAR_BRAIN_PATH	= 'B';
 static const char CHAR_THREAD_COUNT	= 'T';
-static const char CHAR_FORCE		= 'F';
-static const char CHAR_DISTANCE		= 'D';
+static const char CHAR_BACK_IDX		= 'Z';
 
 static const size_t DEF_THREAD_COUNT = 8UL;
 static const size_t DEF_WORD_DISTANCE = 3UL;
@@ -124,6 +126,14 @@ static const size_t DEF_WORD_DISTANCE = 3UL;
 // --------------------------------------------------------------------- //
 // ----- macros -------------------------------------------------------- //
 // --------------------------------------------------------------------- //
+
+static Critical s_consoleCheck;
+
+#define ConsoleOut( code )						\
+{												\
+	CriticalScope	scope( s_consoleCheck );	\
+	{ code; }									\
+};
 
 // --------------------------------------------------------------------- //
 // ----- type definitions ---------------------------------------------- //
@@ -162,17 +172,24 @@ struct ProcessorType<MailIndexerPtr>
 	typedef MailIndexerPtr object_type;
 
 	static MailIndex		s_mailIndex;
-	static bool				s_changed;
+	static bool				s_indexChanged;
 	static Critical			s_mailIndexCritical;
 
-	void process( const MailIndexerPtr &ptr )
+	void process( const MailIndexerPtr &ptr, void *pool, void *mainData )
 	{
 		doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<MailIndexerCmd>::mergeIndex");
-		CriticalScope scope( s_mailIndexCritical );
+		try
+		{
+			CriticalScope scope( s_mailIndexCritical );
 
-		const MailIndexerCmd &cmd = *ptr;
-		s_mailIndex.mergeIndexPositions( MailAddress(cmd.mboxFile, cmd.idx), cmd.index );
-		s_changed = true;
+			const MailIndexerCmd &cmd = *ptr;
+			s_mailIndex.mergeIndexPositions( MailAddress(cmd.mboxFile, cmd.idx), cmd.index );
+			s_indexChanged = true;
+		}
+		catch( ... )
+		{
+			ConsoleOut( std::cerr << "MainIndexerError" << std::endl );
+		}
 	}
 };
 
@@ -190,9 +207,8 @@ struct ProcessorType<STRING>
 
 	static int				s_flags;
 
-	static Critical			s_brainCritical;
 	static Brain			s_Brain;
-	static bool				s_changed;
+	static bool				s_brainChanged;
 	static STRING			s_brainFile;
 	static size_t			s_wordDistance;
 
@@ -250,18 +266,23 @@ struct ProcessorType<STRING>
 		s_arg.condAppend(DIRECTORY_DELIMITER);
 	}
 
-	void process( const STRING &file )
+	void process( const STRING &file, void *ipool, void *mainData )
 	{
 		doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<STRING>::process");
 		doLogValueEx( gakLogging::llInfo, file );
 
+		ThreadPool<STRING>	*pool = (ThreadPool<STRING>*)ipool;
 		F_STRING	mboxFile;
 		STRING		indexFile;
 		STRING		posFile;
 		size_t		idx=0;
-		MboxIndex	mboxIndex;
-		Mails		theMails;
-		std::cout << "process: " << file << std::endl;
+		std::auto_ptr<Mails>		p_theMails(new Mails);
+		Mails		&theMails = *p_theMails;
+		std::auto_ptr<MboxIndex>	p_mboxIndex(new MboxIndex());
+		MboxIndex	&mboxIndex = *p_mboxIndex;
+		StopWatch	sw(true);
+
+		ConsoleOut( std::cout << Thread::FindCurrentThreadIdx() << " process: " << file << ' ' << pool->size() << std::endl );
 		posFile = indexFile = s_indexPath;
 		if( !s_arg.isEmpty() )
 		{
@@ -293,7 +314,8 @@ struct ProcessorType<STRING>
 		loadMboxFile( file, theMails, &positions );
 		s_mailCount += theMails.size();
 		doLogValueEx(gakLogging::llInfo, s_mailCount );
-		std::cout << "read " << theMails.size() << " Mails from " << file << std::endl;
+
+		ConsoleOut( std::cout << Thread::FindCurrentThreadIdx() << " read " << theMails.size() << " Mails from " << file << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl );
 
 		for( 
 			Mails::iterator it = theMails.begin(), endIT = theMails.end();
@@ -316,35 +338,43 @@ struct ProcessorType<STRING>
 					text += it->date.getOriginalTime();
 				}
 				StringTokens tokens;
-				StringIndexPtr index = createStringIndex();
-				tokenString( text, s_stopWords, IS_WORD, &tokens );
-				processPositions(text, tokens, index );
-				StringIndex indexCpy = *index;
 				{
-					MailIndexerPtr cmd = createIndexerCmd(mboxFile, idx, index);
-					g_IndexerPool->process(cmd);
+					StringIndexPtr index = createStringIndex();
+					tokenString( text, s_stopWords, IS_WORD, &tokens );
+					processPositions(text, tokens, index );
+					StringIndex indexCpy = *index;
+					{
+						MailIndexerPtr cmd = createIndexerCmd(mboxFile, idx, index);
+						g_IndexerPool->process(cmd);
+					}
+					mboxIndex.mergeIndexPositions( idx, &indexCpy );
+					doLogValueEx(gakLogging::llInfo, mboxIndex.size() );
 				}
-				mboxIndex.mergeIndexPositions( idx, &indexCpy );
-				doLogValueEx(gakLogging::llInfo, mboxIndex.size() );
 
 				if( s_flags & OPT_BRAIN_PATH )
 				{
+					static Critical	s_brainCritical;
+
 					CriticalScope	scope( s_brainCritical );
-					s_changed = true;
+					s_brainChanged = true;
 					s_Brain.learnFromTokens(text, tokens, s_wordDistance);
 				}
 			}
 			idx++;
-			gakLogging::doShowProgress( 'R', idx, theMails.size() );
+			ConsoleOut( gakLogging::doShowProgress( 'R', idx, theMails.size() ) );
 		}
 
-		std::cout << "writing: " << indexFile << std::endl;
+		ConsoleOut( std::cout << Thread::FindCurrentThreadIdx() << " writing: " << indexFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl );
 		makePath(indexFile);
 		writeToBinaryFile( indexFile, mboxIndex, MBOX_INDEX_MAGIC, MBOX_INDEX_VERSION, ovmShortDown );
-		std::cout << "writing: " << posFile << std::endl;
+		ConsoleOut( std::cout << Thread::FindCurrentThreadIdx() << " writing: " << posFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl );
 		makePath(posFile);
 		writeToBinaryFile( posFile, positions, MBOX_POS_MAGIC, MBOX_POS_VERSION, ovmShortDown );
-		std::cout << "Processed " << file << ", found " << theMails.size() << '/' << s_mailCount << " mails."<< std::endl;
+		ConsoleOut( std::cout << Thread::FindCurrentThreadIdx() << " Processed " << file << ", found " << theMails.size() << '/' << s_mailCount << " mails. "<< sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl );
+
+		positions.clear();
+		p_mboxIndex.release();
+		p_theMails.release();
 	}
 };
 
@@ -365,6 +395,7 @@ static CommandLine::Options options[] =
 	{ CHAR_THREAD_COUNT,	"threadCount",	0, 1, OPT_THREAD_COUNT|CommandLine::needArg, "number of threads (<32>)" },
 	{ CHAR_FORCE,			"force",		0, 1, FLAG_FORCE, "force indexing" },
 	{ CHAR_DISTANCE,		"maxDistance",	0, 1, OPT_WORD_DISTANCE|CommandLine::needArg, "max. word distance for AI (<3>)" },
+	{ CHAR_BACK_IDX,		"backIdx",		0, 1, FLAG_BACK_IDX, "main index in back groond" },
 	{ 0 }
 };
 
@@ -376,16 +407,15 @@ size_t			ProcessorType<STRING>::s_mailCount = 0;
 Set<CI_STRING>	ProcessorType<STRING>::s_stopWords;
 STRING			ProcessorType<STRING>::s_arg;
 STRING			ProcessorType<STRING>::s_indexPath;
-Critical		ProcessorType<STRING>::s_brainCritical;
 
 Brain			ProcessorType<STRING>::s_Brain;
-bool			ProcessorType<STRING>::s_changed = false;
+bool			ProcessorType<STRING>::s_brainChanged = false;
 STRING			ProcessorType<STRING>::s_brainFile;
 int				ProcessorType<STRING>::s_flags = 0;
 size_t			ProcessorType<STRING>::s_wordDistance = DEF_WORD_DISTANCE;
 
 MailIndex		ProcessorType<MailIndexerPtr>::s_mailIndex;
-bool			ProcessorType<MailIndexerPtr>::s_changed = false;
+bool			ProcessorType<MailIndexerPtr>::s_indexChanged = false;
 Critical		ProcessorType<MailIndexerPtr>::s_mailIndexCritical;
 
 
@@ -406,16 +436,11 @@ static int mboxIndexer( const CommandLine &cmdLine )
 	if( cmdLine.flags & OPT_THREAD_COUNT )
 	{
 		threadCount = getValueE<size_t>(cmdLine.parameter[CHAR_THREAD_COUNT][0]);
-		/*
-		if( !threadCount )
-		{
-			threadCount = DEF_THREAD_COUNT;
-		}
-		*/
 	}
-	g_IndexerPool.reset(new ThreadPool<MailIndexerPtr>(threadCount ? 1 : 0,"MailIndexer"));
+	size_t backGroundIDX = !threadCount? 0 : (cmdLine.flags & FLAG_BACK_IDX ? 1 : 0);
+	g_IndexerPool.reset(new ThreadPool<MailIndexerPtr>(backGroundIDX,"MailIndexer"));
 
-	ParalelDirScanner	theScanner("mboxIndexer", cmdLine,threadCount);
+	ParalelDirScanner	theScanner("mboxIndexer", cmdLine, nullptr, threadCount);
 
 	ProcessorType<STRING>::init(cmdLine);
 
@@ -442,21 +467,21 @@ static int mboxIndexer( const CommandLine &cmdLine )
 
 		theScanner(cmdLine.argv[i]);
 	}
-	std::cout << "Mbox Indexer completed\nWaiting for full indexer " << g_IndexerPool->size() << std::endl;
+	ConsoleOut( std::cout << "Mbox Indexer completed\nWaiting for full indexer " << g_IndexerPool->size() << std::endl );
 	g_IndexerPool->flush();
 	g_IndexerPool->shutdown();
 	g_IndexerPool.release();
 
 #ifndef NDEBUG
-	std::cout << __FILE__ << __LINE__ << " # stopwords " << ProcessorType<STRING>::s_stopWords.size() << std::endl;
+	ConsoleOut( std::cout << __FILE__ << __LINE__ << " # stopwords " << ProcessorType<STRING>::s_stopWords.size() << std::endl );
 #endif
 	ProcessorType<STRING>::s_stopWords.clear();
 
 	doLogPositionEx( gakLogging::llInfo );
-	if( ProcessorType<STRING>::s_changed )
+	if( ProcessorType<STRING>::s_brainChanged )
 	{
 		doLogPositionEx( gakLogging::llInfo );
-		std::cout << "writing: " << brainFile << std::endl;
+		ConsoleOut( std::cout << "writing: " << brainFile << std::endl );
 		makePath(indexFile);
 		writeToBinaryFile( brainFile, brain, BRAIN_MAGIC, BRAIN_VERSION, ovmShortDown );
 		doLogPositionEx( gakLogging::llInfo );
@@ -466,19 +491,18 @@ static int mboxIndexer( const CommandLine &cmdLine )
 	else
 	{
 		doLogPositionEx( gakLogging::llInfo );
-		std::cout << "Not writing: " << brainFile << std::endl;
+		ConsoleOut( std::cout << "Not writing: " << brainFile << std::endl );
 	}
 
-	if( ProcessorType<MailIndexerPtr>::s_changed )
+	if( ProcessorType<MailIndexerPtr>::s_indexChanged )
 	{
-		std::cout << "writing: " << indexFile << std::endl;
+		ConsoleOut( std::cout << "writing: " << indexFile << std::endl );
 		makePath(indexFile);
 		writeToBinaryFile( indexFile, index, MAIL_INDEX_MAGIC, MAIL_INDEX_VERSION, ovmShortDown );
-
-		std::cout << "Creating statistic" << std::endl;
+		ConsoleOut( std::cout << "Creating statistic" << std::endl );
 		StatistikData sd;
 		index.getStatistik(&sd);
-		std::cout << "Writing statistic " << sd.size() << std::endl;
+		ConsoleOut( std::cout << "Writing statistic " << sd.size() << std::endl );
 		std::size_t count = 0;
 		std::ofstream	of(ProcessorType<STRING>::s_indexPath+"index.log" );
 		for(
@@ -490,7 +514,7 @@ static int mboxIndexer( const CommandLine &cmdLine )
 			++count;
 			of << it->m_word << ' ' << it->m_count << '\n';
 #ifndef NDEBUG
-			gakLogging::doShowProgress( 'I', count, sd.size() );
+			ConsoleOut(gakLogging::doShowProgress( 'I', count, sd.size() ));
 #endif
 		}
 		doLogPositionEx( gakLogging::llInfo );
