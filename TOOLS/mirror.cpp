@@ -756,11 +756,11 @@ static void mirror(
 	{
 		if( !deleteTime && !theDeleteConsumer->isRunning )
 		{
-			deleteTime = sw.get<Seconds<>>().asSeconds();
+			deleteTime = sw.get< Seconds<> >().asSeconds();
 		}
 		if( !copyTime && !theCopyConsumer->isRunning )
 		{
-			copyTime = sw.get<Seconds<>>().asSeconds();
+			copyTime = sw.get< Seconds<> >().asSeconds();
 		}
 		Sleep( 1000 );
 
@@ -862,11 +862,11 @@ static void mirror(
 	sw.stop();
 	if( !deleteTime )
 	{
-		deleteTime = sw.get<Seconds<>>().asSeconds();
+		deleteTime = sw.get< Seconds<> >().asSeconds();
 	}
 	if( !copyTime )
 	{
-		copyTime = sw.get<Seconds<>>().asSeconds();
+		copyTime = sw.get< Seconds<> >().asSeconds();
 	}
 	if( !deleteTime )
 	{
@@ -880,7 +880,7 @@ static void mirror(
 
 	if( compareMode )
 	{
-		clock_t checkTime = sw.get<Seconds<>>().asSeconds();;
+		clock_t checkTime = sw.get< Seconds<> >().asSeconds();;
 		if( !checkTime )
 		{
 			checkTime = 1;

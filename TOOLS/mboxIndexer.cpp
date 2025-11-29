@@ -131,7 +131,7 @@ static const size_t DEF_WORD_DISTANCE = 3UL;
 // ----- macros -------------------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-#if 1
+#if __cplusplus >= 199703
 template <typename FunctorT>
 static void ConsoleOut( const FunctorT &functor )
 {
@@ -182,225 +182,232 @@ inline MailIndexerPtr createIndexerCmd(const STRING &theName, size_t idx, const 
 	return MailIndexerPtr::makeShared(theName, idx, index);
 }
 
-template <>
-struct ProcessorType<MailIndexerPtr>
+namespace gak
 {
-	typedef MailIndexerPtr object_type;
-
-	static MailIndex		s_mailIndex;
-	static bool				s_indexChanged;
-	static Critical			s_mailIndexCritical;
-
-	void process( const MailIndexerPtr &ptr, void *pool, void *mainData )
+	template <>
+	struct ProcessorType<MailIndexerPtr>
 	{
-		doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<MailIndexerCmd>::mergeIndex");
-		try
+		typedef MailIndexerPtr object_type;
+
+		static MailIndex		s_mailIndex;
+		static bool				s_indexChanged;
+		static Critical			s_mailIndexCritical;
+
+		void process( const MailIndexerPtr &ptr, void *pool, void *mainData )
 		{
-			CriticalScope scope( s_mailIndexCritical );
+			doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<MailIndexerCmd>::mergeIndex");
+			try
+			{
+				CriticalScope scope( s_mailIndexCritical );
 
-			const MailIndexerCmd &cmd = *ptr;
-			s_mailIndex.copyIndexPositions( MailAddress(cmd.mboxFile, cmd.idx), *cmd.index );
-			s_indexChanged = true;
+				const MailIndexerCmd &cmd = *ptr;
+				s_mailIndex.copyIndexPositions( MailAddress(cmd.mboxFile, cmd.idx), *cmd.index );
+				s_indexChanged = true;
+			}
+			catch( ... )
+			{
+				ConsoleOut( F_BIND { std::cerr << "MainIndexerError" << std::endl; } );
+			}
 		}
-		catch( ... )
-		{
-			ConsoleOut( F_BIND { std::cerr << "MainIndexerError" << std::endl; } );
-		}
-	}
-};
+	};
+}
 
-static std::auto_ptr<ThreadPool<MailIndexerPtr>>	g_IndexerPool;
+static std::auto_ptr< ThreadPool<MailIndexerPtr> >	g_IndexerPool;
 
-template <>
-struct ProcessorType<STRING>
+namespace gak
 {
-	typedef STRING object_type;
-
-	static size_t			s_mailCount;
-	static Set<CI_STRING>	s_stopWords;
-	static STRING			s_arg;
-	static STRING			s_indexPath;
-
-	static int				s_flags;
-
-	static Brain			s_Brain;
-	static bool				s_brainChanged;
-	static STRING			s_brainFile;
-	static size_t			s_wordDistance;
-
-	static void init(const CommandLine	&cmdLine)
+	template <>
+	struct ProcessorType<STRING>
 	{
-		doEnterFunctionEx(gakLogging::llInfo, "ProcessorType<STRING>::init");
-		s_mailCount = 0;
-		if( cmdLine.flags & OPT_STOP_WORDS )
+		typedef STRING object_type;
+
+		static size_t			s_mailCount;
+		static Set<CI_STRING>	s_stopWords;
+		static STRING			s_arg;
+		static STRING			s_indexPath;
+
+		static int				s_flags;
+
+		static Brain			s_Brain;
+		static bool				s_brainChanged;
+		static STRING			s_brainFile;
+		static size_t			s_wordDistance;
+
+		static void init(const CommandLine	&cmdLine)
 		{
-			STRING stopWordsFile = cmdLine.parameter[CHAR_STOP_WORDS][0];
-			std::cout << "Reading " << stopWordsFile << '\n';
-			std::ifstream	in(stopWordsFile);
-			while( in )
+			doEnterFunctionEx(gakLogging::llInfo, "ProcessorType<STRING>::init");
+			s_mailCount = 0;
+			if( cmdLine.flags & OPT_STOP_WORDS )
 			{
-				CI_STRING word;
-				in >> word;
-				word.stripBlanks();
-				if( !word.isEmpty() )
+				STRING stopWordsFile = cmdLine.parameter[CHAR_STOP_WORDS][0];
+				std::cout << "Reading " << stopWordsFile << '\n';
+				std::ifstream	in(stopWordsFile);
+				while( in )
 				{
-					word.lowerCase();
-					s_stopWords.addElement( word );
-				}
-			}
-			in.close();
-			std::ofstream 	fp( stopWordsFile );
-			fp << s_stopWords;
-			fp.close();
-		}
-		if( cmdLine.flags & OPT_INDEX_PATH )
-		{
-			s_indexPath = cmdLine.parameter[CHAR_INDEX_PATH][0];
-			s_indexPath.condAppend(DIRECTORY_DELIMITER);
-		}
-
-		if( cmdLine.flags & OPT_BRAIN_PATH )
-		{
-			s_brainFile = cmdLine.parameter[CHAR_BRAIN_PATH][0];
-			s_brainFile.condAppend(DIRECTORY_DELIMITER);
-			s_brainFile += BRAIN_FILE;
-		}
-
-		s_flags = cmdLine.flags;
-		if( cmdLine.flags & OPT_WORD_DISTANCE )
-		{
-			s_wordDistance = getValueE<size_t>(cmdLine.parameter[CHAR_DISTANCE][0]);
-			if( !s_wordDistance )
-			{
-				s_wordDistance = DEF_WORD_DISTANCE;
-			}
-		}
-	}
-	static void setArg( const STRING &path )
-	{
-		s_arg = path;
-		s_arg.condAppend(DIRECTORY_DELIMITER);
-	}
-
-	void process( const STRING &file, void *ipool, void *mainData )
-	{
-		doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<STRING>::process");
-		doLogValueEx( gakLogging::llInfo, file );
-
-		ThreadPool<STRING>	*pool = (ThreadPool<STRING>*)ipool;
-		F_STRING	mboxFile;
-		STRING		indexFile;
-		STRING		posFile;
-		size_t		idx=0;
-		std::auto_ptr<Mails>		p_theMails(new Mails);
-		Mails		&theMails = *p_theMails;
-		std::auto_ptr<MboxIndex>	p_mboxIndex(new MboxIndex());
-		MboxIndex	&mboxIndex = *p_mboxIndex;
-		StopWatch	sw(true);
-
-		ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " process: " << file << ' ' << pool->size() << std::endl; } );
-		posFile = indexFile = s_indexPath;
-		if( !s_arg.isEmpty() )
-		{
-			mboxFile = file.subString( s_arg.strlen() );
-		}
-		if( mboxFile.isEmpty() )
-		{
-			fsplit(file, NULL, &mboxFile);
-		}
-		indexFile += mboxFile + MBOX_INDEX_EXT;
-		posFile += mboxFile + MBOX_POS_EXT;
-
-		if( !(s_flags & FLAG_FORCE) && !strAccess(indexFile,0) && !strAccess(posFile,0) )
-		{
-			DirectoryEntry theFileEntry(file);
-			DirectoryEntry theIndexEntry(indexFile);
-
-			if( theFileEntry.modifiedDate < theIndexEntry.modifiedDate )
-			{
-				DirectoryEntry thePosEntry(posFile);
-				if( theFileEntry.modifiedDate < thePosEntry.modifiedDate )
-				{
-					return;
-				}
-			}
-		}
-
-		Array<int64> positions;
-		loadMboxFile( file, theMails, &positions );
-		s_mailCount += theMails.size();
-		doLogValueEx(gakLogging::llInfo, s_mailCount );
-
-		ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " read " << theMails.size() << " Mails from " << file << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
-
-		for( 
-			Mails::iterator it = theMails.begin(), endIT = theMails.end();
-			it != endIT;
-			++it
-		)
-		{
-			const MAIL &theMail = *it;
-			STRING text = theMail.extractPlainText();
-			if( !text.isEmpty() && text.size() < 1024*1024 )	// do not process extra large mails
-			{
-				if( s_flags & FLAG_USE_META )
-				{
-					doLogValueEx(gakLogging::llDetail, it->from);
-					text += it->from;
-					doLogValueEx(gakLogging::llDetail, it->to);
-					text += it->to;
-					doLogValueEx(gakLogging::llDetail, it->subject);
-					text += it->subject;
-					text += it->date.getOriginalTime();
-				}
-				StringTokens tokens;
-				{
-					StringIndexPtr index = createStringIndex();
-					tokenString( text, s_stopWords, IS_WORD, &tokens );
-					processPositions(text, tokens, index );
+					CI_STRING word;
+					in >> word;
+					word.stripBlanks();
+					if( !word.isEmpty() )
 					{
-						MailIndexerPtr cmd = createIndexerCmd(mboxFile, idx, index);
-						g_IndexerPool->process(cmd);
+						word.lowerCase();
+						s_stopWords.addElement( word );
 					}
-					mboxIndex.copyIndexPositions( idx, *index );
-					doLogValueEx(gakLogging::llInfo, mboxIndex.size() );
 				}
+				in.close();
+				std::ofstream 	fp( stopWordsFile );
+				fp << s_stopWords;
+				fp.close();
+			}
+			if( cmdLine.flags & OPT_INDEX_PATH )
+			{
+				s_indexPath = cmdLine.parameter[CHAR_INDEX_PATH][0];
+				s_indexPath.condAppend(DIRECTORY_DELIMITER);
+			}
 
-				if( s_flags & OPT_BRAIN_PATH )
+			if( cmdLine.flags & OPT_BRAIN_PATH )
+			{
+				s_brainFile = cmdLine.parameter[CHAR_BRAIN_PATH][0];
+				s_brainFile.condAppend(DIRECTORY_DELIMITER);
+				s_brainFile += BRAIN_FILE;
+			}
+
+			s_flags = cmdLine.flags;
+			if( cmdLine.flags & OPT_WORD_DISTANCE )
+			{
+				s_wordDistance = getValueE<size_t>(cmdLine.parameter[CHAR_DISTANCE][0]);
+				if( !s_wordDistance )
 				{
-					static Critical	s_brainCritical;
-
-					CriticalScope	scope( s_brainCritical );
-					s_brainChanged = true;
-					s_Brain.learnFromTokens(text, tokens, s_wordDistance);
+					s_wordDistance = DEF_WORD_DISTANCE;
 				}
 			}
-			idx++;
-			ConsoleOut( F_BIND { gakLogging::doShowProgress( 'R', idx, theMails.size() ); } );
 		}
-#if TEST_RECURSION
-		//assert(mboxIndex.testRecursion());
-		if( !mboxIndex.testRecursion() )
+		static void setArg( const STRING &path )
 		{
-			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Recursion Error " << indexFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			s_arg = path;
+			s_arg.condAppend(DIRECTORY_DELIMITER);
 		}
-#endif
-		ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " writing: " << indexFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
-		makePath(indexFile);
-		writeToBinaryFile( indexFile, mboxIndex, MBOX_INDEX_MAGIC, MBOX_INDEX_VERSION, ovmShortDown );
-		ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " writing: " << posFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
-		makePath(posFile);
-		writeToBinaryFile( posFile, positions, MBOX_POS_MAGIC, MBOX_POS_VERSION, ovmShortDown );
-		ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Written: " << posFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
 
-		positions.clear();
-		ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Deleting index " << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
-		p_mboxIndex.release();
-		ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Deleting mails " << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
-		p_theMails.release();
-		ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Processed " << file << ", found " << theMails.size() << '/' << s_mailCount << " mails. "<< sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
-	}
-};
+		void process( const STRING &file, void *ipool, void *mainData )
+		{
+			doEnterFunctionEx(gakLogging::llInfo,"ProcessorType<STRING>::process");
+			doLogValueEx( gakLogging::llInfo, file );
+
+			ThreadPool<STRING>	*pool = (ThreadPool<STRING>*)ipool;
+			F_STRING	mboxFile;
+			STRING		indexFile;
+			STRING		posFile;
+			size_t		idx=0;
+			std::auto_ptr<Mails>		p_theMails(new Mails);
+			Mails		&theMails = *p_theMails;
+			std::auto_ptr<MboxIndex>	p_mboxIndex(new MboxIndex());
+			MboxIndex	&mboxIndex = *p_mboxIndex;
+			StopWatch	sw(true);
+
+			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " process: " << file << ' ' << pool->size() << std::endl; } );
+			posFile = indexFile = s_indexPath;
+			if( !s_arg.isEmpty() )
+			{
+				mboxFile = file.subString( s_arg.strlen() );
+			}
+			if( mboxFile.isEmpty() )
+			{
+				fsplit(file, NULL, &mboxFile);
+			}
+			indexFile += mboxFile + MBOX_INDEX_EXT;
+			posFile += mboxFile + MBOX_POS_EXT;
+
+			if( !(s_flags & FLAG_FORCE) && !strAccess(indexFile,0) && !strAccess(posFile,0) )
+			{
+				DirectoryEntry theFileEntry(file);
+				DirectoryEntry theIndexEntry(indexFile);
+
+				if( theFileEntry.modifiedDate < theIndexEntry.modifiedDate )
+				{
+					DirectoryEntry thePosEntry(posFile);
+					if( theFileEntry.modifiedDate < thePosEntry.modifiedDate )
+					{
+						return;
+					}
+				}
+			}
+
+			Array<int64> positions;
+			loadMboxFile( file, theMails, &positions );
+			s_mailCount += theMails.size();
+			doLogValueEx(gakLogging::llInfo, s_mailCount );
+
+			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " read " << theMails.size() << " Mails from " << file << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+
+			for( 
+				Mails::iterator it = theMails.begin(), endIT = theMails.end();
+				it != endIT;
+				++it
+			)
+			{
+				const MAIL &theMail = *it;
+				STRING text = theMail.extractPlainText();
+				if( !text.isEmpty() && text.size() < 1024*1024 )	// do not process extra large mails
+				{
+					if( s_flags & FLAG_USE_META )
+					{
+						doLogValueEx(gakLogging::llDetail, it->from);
+						text += it->from;
+						doLogValueEx(gakLogging::llDetail, it->to);
+						text += it->to;
+						doLogValueEx(gakLogging::llDetail, it->subject);
+						text += it->subject;
+						text += it->date.getOriginalTime();
+					}
+					StringTokens tokens;
+					{
+						StringIndexPtr index = createStringIndex();
+						tokenString( text, s_stopWords, IS_WORD, &tokens );
+						processPositions(text, tokens, index );
+						{
+							MailIndexerPtr cmd = createIndexerCmd(mboxFile, idx, index);
+							g_IndexerPool->process(cmd);
+						}
+						mboxIndex.copyIndexPositions( idx, *index );
+						doLogValueEx(gakLogging::llInfo, mboxIndex.size() );
+					}
+
+					if( s_flags & OPT_BRAIN_PATH )
+					{
+						static Critical	s_brainCritical;
+
+						CriticalScope	scope( s_brainCritical );
+						s_brainChanged = true;
+						s_Brain.learnFromTokens(text, tokens, s_wordDistance);
+					}
+				}
+				idx++;
+				ConsoleOut( F_BIND { gakLogging::doShowProgress( 'R', idx, theMails.size() ); } );
+			}
+#if TEST_RECURSION
+			//assert(mboxIndex.testRecursion());
+			if( !mboxIndex.testRecursion() )
+			{
+				ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Recursion Error " << indexFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			}
+#endif
+			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " writing: " << indexFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			makePath(indexFile);
+			writeToBinaryFile( indexFile, mboxIndex, MBOX_INDEX_MAGIC, MBOX_INDEX_VERSION, ovmShortDown );
+			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " writing: " << posFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			makePath(posFile);
+			writeToBinaryFile( posFile, positions, MBOX_POS_MAGIC, MBOX_POS_VERSION, ovmShortDown );
+			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Written: " << posFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+
+			positions.clear();
+			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Deleting index " << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			p_mboxIndex.release();
+			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Deleting mails " << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			p_theMails.release();
+			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Processed " << file << ", found " << theMails.size() << '/' << s_mailCount << " mails. "<< sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+		}
+	};
+
+}
 
 // --------------------------------------------------------------------- //
 // ----- exported datas ------------------------------------------------ //

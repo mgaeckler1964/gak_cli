@@ -7,14 +7,19 @@ NO_DEBUG=-DNDEBUG -O3
 CFLAGS=-I../GAKLIB/INCLUDE -D_REENTRANT ${NO_DEBUG}
 # -fpermissive
 
+#	${OUTDIR}/hash \
+
 TOOLS=\
 	${OUTDIR}/aes \
+	${OUTDIR}/cliChess \
 	${OUTDIR}/dlink \
 	${OUTDIR}/dupMails \
-	${OUTDIR}/hash \
 	${OUTDIR}/iTunesCheck \
 	${OUTDIR}/iTunesCompare \
 	${OUTDIR}/iTunesCopy \
+	${OUTDIR}/mboxIndexer \
+	${OUTDIR}/mboxSearch \
+	${OUTDIR}/minMax \
 	${OUTDIR}/mirror \
 	${OUTDIR}/tdiff
 
@@ -25,34 +30,46 @@ clean:
 	-rm ${TOOLS}
 
 ${OUTDIR}/aes: TOOLS/aes.cpp ${GAKLIB}
-	g++ ${CFLAGS} -o $@ $^  ${SSLLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^  ${SSLLIB}
+
+${OUTDIR}/cliChess: TOOLS/cliChess.cpp ${GAKLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^  ${SSLLIB}
 
 ${OUTDIR}/dlink: TOOLS/dlink.cpp ${GAKLIB}
-	g++ ${CFLAGS} -o $@ $^  ${SSLLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^  ${SSLLIB}
 
 ${OUTDIR}/dupMails: TOOLS/dupMails.cpp ${GAKLIB}
-	g++ ${CFLAGS} -o $@ $^  ${SSLLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^  ${SSLLIB}
 
 ${OUTDIR}/hash: TOOLS/hash.cpp ${GAKLIB}
 	g++ ${CFLAGS} -o $@ $^  ${SSLLIB}
 
 ${OUTDIR}/iTunesCheck: TOOLS/iTunesCheck.cpp ${GAKLIB}
-	g++ ${CFLAGS} -o $@ $^  ${SSLLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^  ${SSLLIB}
 
 ${OUTDIR}/iTunesCompare: TOOLS/iTunesCompare.cpp ${GAKLIB}
-	g++ ${CFLAGS} -o $@ $^  ${SSLLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^  ${SSLLIB}
 
 ${OUTDIR}/iTunesCopy: TOOLS/iTunesCopy.cpp ${GAKLIB}
-	g++ ${CFLAGS} -o $@ $^  ${SSLLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^  ${SSLLIB}
+
+${OUTDIR}/mboxIndexer: TOOLS/mboxIndexer.cpp ${GAKLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^ ${SSLLIB}
+
+${OUTDIR}/mboxSearch: TOOLS/mboxSearch.cpp ${GAKLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^ ${SSLLIB}
+
+${OUTDIR}/minMax: TOOLS/minMax.cpp ${GAKLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^ ${SSLLIB}
 
 ${OUTDIR}/mirror: TOOLS/mirror.cpp ${GAKLIB}
 	g++ ${CFLAGS} -lpthread -o $@ $^ ${SSLLIB}
 
 ${OUTDIR}/tdiff: TOOLS/tdiff.cpp ${GAKLIB}
-	g++ ${CFLAGS} -o $@ $^ 
+	g++ ${CFLAGS} -lpthread -o $@ $^ 
 
 ${OUTDIR}/xmlGalery: TOOLS/xmlGalery.cpp ${GAKLIB}
-	g++ ${CFLAGS} -o $@ $^ 
+	g++ ${CFLAGS} -lpthread -o $@ $^ 
 
 ${OUTDIR}/%.o: %.cpp
 	g++ ${CFLAGS} -c $< -o $@

@@ -112,7 +112,7 @@ static gak::CommandLine::Options options[] =
 {
 	{ CHAR_INDEX_PATH,	"indexPath",	0, 1, FLAG_INDEX_PATH|gak::CommandLine::needArg,	"path where to find the index" },
 	{ CHAR_BRAIN_PATH,	"brainPath",	0, 1, FLAG_BRAIN_PATH|gak::CommandLine::needArg,	"path where to store the AI brain" },
-	{ CHAR_MBOX_PATH,	"mboxPath",		0, -1, FLAG_MBOX_PATH|gak::CommandLine::needArg,	"path where to find the mbox files" },
+	{ CHAR_MBOX_PATH,	"mboxPath",		0, unsigned(-1), FLAG_MBOX_PATH|gak::CommandLine::needArg,	"path where to find the mbox files" },
 	{ CHAR_STATISTICS,	"showStats",	0, 1, FLAG_STATISTICS,								"show statistics" },
 	{ 0 }
 };
@@ -181,7 +181,11 @@ static void aiSearch( const gak::CommandLine &cmdLine )
 			argv++;
 			std::cout << "\nSearching for " << argv << std::endl;
 			Set<STRING> partners = brain.getPartners( argv );
+#ifdef __GNUC__	//  __cplusplus >= 201703
+			result = substractSorted( result, partners );
+#else
 			result.moveFrom( substractSorted( result, partners ) );
+#endif
 		}
 	}
 	std::cout << "\nFound:" << std::endl;
