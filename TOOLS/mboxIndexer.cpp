@@ -56,11 +56,9 @@
 // ----- switches ------------------------------------------------------ //
 // --------------------------------------------------------------------- //
 
-#define DEBUG_LOG		1
 #define PROFILER		1
 #define USE_PAIR_MAP	0		// for searching pair map is better than TreeMap that is faster for indexing
 
-#define WRITE_STATS		1
 #define TEST_RECURSION	0
 
 // --------------------------------------------------------------------- //
@@ -140,7 +138,7 @@ static Critical s_consoleCheck;
 	CriticalScope	scope( s_consoleCheck );
 	functor();
 }
-#define F_BIND	[=]
+#define F_BIND	[&]
 #else
 static Critical s_consoleCheck;
 #define ConsoleOut( statement )					\
@@ -150,6 +148,11 @@ static Critical s_consoleCheck;
 }
 #define F_BIND
 #endif
+
+inline size_t FindCurrentThreadIdx()
+{
+	return Thread::FindCurrentThreadIdx()+1;
+}
 
 // --------------------------------------------------------------------- //
 // ----- type definitions ---------------------------------------------- //
@@ -303,7 +306,7 @@ namespace gak
 			MboxIndex	&mboxIndex = *p_mboxIndex;
 			StopWatch	sw(true);
 
-			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " process: " << file << ' ' << pool->size() << std::endl; } );
+			ConsoleOut( F_BIND { std::cout << FindCurrentThreadIdx() << " process: " << file << ' ' << pool->size() << std::endl; } );
 			posFile = indexFile = s_indexPath;
 			if( !s_arg.isEmpty() )
 			{
@@ -336,7 +339,7 @@ namespace gak
 			s_mailCount += theMails.size();
 			doLogValueEx(gakLogging::llInfo, s_mailCount );
 
-			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " read " << theMails.size() << " Mails from " << file << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			ConsoleOut( F_BIND { std::cout << FindCurrentThreadIdx() << " read " << theMails.size() << " Mails from " << file << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
 
 			for( 
 				Mails::iterator it = theMails.begin(), endIT = theMails.end();
@@ -387,23 +390,24 @@ namespace gak
 			//assert(mboxIndex.testRecursion());
 			if( !mboxIndex.testRecursion() )
 			{
-				ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Recursion Error " << indexFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+				ConsoleOut( F_BIND { std::cout << FindCurrentThreadIdx() << " Recursion Error " << indexFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
 			}
 #endif
-			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " writing: " << indexFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			ConsoleOut( F_BIND { std::cout << FindCurrentThreadIdx() << " writing: " << indexFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
 			makePath(indexFile);
 			writeToBinaryFile( indexFile, mboxIndex, MBOX_INDEX_MAGIC, MBOX_INDEX_VERSION, ovmShortDown );
-			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " writing: " << posFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			ConsoleOut( F_BIND { std::cout << FindCurrentThreadIdx() << " writing: " << posFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
 			makePath(posFile);
 			writeToBinaryFile( posFile, positions, MBOX_POS_MAGIC, MBOX_POS_VERSION, ovmShortDown );
-			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Written: " << posFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			ConsoleOut( F_BIND { std::cout << FindCurrentThreadIdx() << " Written: " << posFile << ' ' << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
 
 			positions.clear();
-			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Deleting index " << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
-			p_mboxIndex.release();
-			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Deleting mails " << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
-			p_theMails.release();
-			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Processed " << file << ", found " << theMails.size() << '/' << s_mailCount << " mails. "<< sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			ConsoleOut( F_BIND { std::cout << FindCurrentThreadIdx() << " Deleting index " << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			p_mboxIndex.reset();
+			ConsoleOut( F_BIND { std::cout << FindCurrentThreadIdx() << " Deleting mails " << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			size_t numMails = p_theMails->size();
+			p_theMails.reset();
+			ConsoleOut( F_BIND { std::cout << FindCurrentThreadIdx() << " Processed " << file << ", found " << numMails << '/' << s_mailCount << " mails. "<< sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
 		}
 	};
 
@@ -504,7 +508,7 @@ static int mboxIndexer( const CommandLine &cmdLine )
 	theScanner.shutdown();
 	g_IndexerPool->flush();
 	g_IndexerPool->shutdown();
-	g_IndexerPool.release();
+	g_IndexerPool.reset();
 
 #ifndef NDEBUG
 	ConsoleOut( F_BIND { std::cout << __FILE__ << __LINE__ << " # stopwords " << ProcessorType<STRING>::s_stopWords.size() << ' ' << sw.get<Hours<> >().toString() <<std::endl; } );
@@ -520,7 +524,7 @@ static int mboxIndexer( const CommandLine &cmdLine )
 		makePath(indexFile);
 		writeToBinaryFile( brainFile, brain, BRAIN_MAGIC, BRAIN_VERSION, ovmShortDown );
 		doLogPositionEx( gakLogging::llInfo );
-		ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Deleting brain " << sw.get<Hours<> >().toString() <<std::endl; } );
+		ConsoleOut( F_BIND { std::cout << FindCurrentThreadIdx() << " Deleting brain " << sw.get<Hours<> >().toString() <<std::endl; } );
 		brain.clear();
 		doLogPositionEx( gakLogging::llInfo );
 	}
@@ -536,13 +540,13 @@ static int mboxIndexer( const CommandLine &cmdLine )
 		ConsoleOut( F_BIND { std::cout << "writing: " << indexFile << ' ' << sw.get<Hours<> >().toString() << std::endl; } );
 		makePath(indexFile);
 		writeToBinaryFile( indexFile, index, MAIL_INDEX_MAGIC, MAIL_INDEX_VERSION, ovmShortDown );
+
 		ConsoleOut( F_BIND { std::cout << "Creating statistic" << ' ' << sw.get<Hours<> >().toString() << std::endl; } );
-#if WRITE_STATS
 		StatistikData sd;
 		index.getStatistik(&sd);
+
 		ConsoleOut( F_BIND { std::cout << "Writing statistic " << sd.size() << std::endl; } );
 		std::size_t count = 0;
-
 		std::ofstream	of(ProcessorType<STRING>::s_indexPath+"index.log" );
 		for(
 			StatistikData::const_iterator it = sd.cbegin(), endIT = sd.cend();
@@ -559,7 +563,7 @@ static int mboxIndexer( const CommandLine &cmdLine )
 		std::cout << "Written statistic -> deleting" << std::endl;
 		doLogPositionEx( gakLogging::llInfo );
 		sd.clear();
-#endif
+
 		ConsoleOut( F_BIND { std::cout << "deleted statistic -> deleting index " << sw.get<Hours<> >().toString() << std::endl; } );
 #if TEST_RECURSION
 		doLogPositionEx( gakLogging::llInfo );
@@ -609,8 +613,8 @@ static int mboxIndexer( const CommandLine &cmdLine )
 int main( int , const char *argv[] )
 {
 	StopWatch	stopWatch(true);
-	//doEnableLogEx( gakLogging::llInfo );
-	doDisableLog();
+	doEnableLogEx( gakLogging::llInfo );
+	//doDisableLog();
 	doEnableProfile(gakLogging::llInfo);
 	doEnterFunctionEx(gakLogging::llInfo, "main");
 
