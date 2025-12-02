@@ -400,10 +400,10 @@ namespace gak
 
 			positions.clear();
 			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Deleting index " << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
-			p_mboxIndex.release();
+			p_mboxIndex.reset();
 			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Deleting mails " << sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
-			p_theMails.release();
-			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Processed " << file << ", found " << theMails.size() << '/' << s_mailCount << " mails. "<< sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
+			p_theMails.reset();
+			ConsoleOut( F_BIND { std::cout << Thread::FindCurrentThreadIdx() << " Processed " << file << ", found " << '/' << s_mailCount << " mails. "<< sw.get<Hours<> >().toString() << ' ' << pool->size() << std::endl; } );
 		}
 	};
 
@@ -504,7 +504,7 @@ static int mboxIndexer( const CommandLine &cmdLine )
 	theScanner.shutdown();
 	g_IndexerPool->flush();
 	g_IndexerPool->shutdown();
-	g_IndexerPool.release();
+	g_IndexerPool.reset();
 
 #ifndef NDEBUG
 	ConsoleOut( F_BIND { std::cout << __FILE__ << __LINE__ << " # stopwords " << ProcessorType<STRING>::s_stopWords.size() << ' ' << sw.get<Hours<> >().toString() <<std::endl; } );
