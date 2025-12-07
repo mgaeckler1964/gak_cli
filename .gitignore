@@ -41,3 +41,7 @@
 alt.txt
 neu.txt
 *.bak
+
+# test scripts
+indexer.cmd
+indexer.sh
