@@ -7,13 +7,13 @@ NO_DEBUG=-DNDEBUG -O3
 CFLAGS=-I../GAKLIB/INCLUDE -D_REENTRANT ${NO_DEBUG}
 # -fpermissive
 
-#	${OUTDIR}/hash \
 
 TOOLS=\
 	${OUTDIR}/aes \
 	${OUTDIR}/cliChess \
 	${OUTDIR}/dlink \
 	${OUTDIR}/dupMails \
+	${OUTDIR}/hash \
 	${OUTDIR}/iTunesCheck \
 	${OUTDIR}/iTunesCompare \
 	${OUTDIR}/iTunesCopy \
