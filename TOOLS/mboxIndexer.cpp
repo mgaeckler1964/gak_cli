@@ -335,7 +335,10 @@ namespace gak
 			}
 
 			Array<int64> positions;
-			loadMboxFile( file, theMails, &positions );
+			{
+				doEnterFunctionEx(gakLogging::llInfo,"loadMboxFile");
+				loadMboxFile( file, theMails, &positions );
+			}
 			s_mailCount += theMails.size();
 			doLogValueEx(gakLogging::llInfo, s_mailCount );
 
@@ -363,6 +366,7 @@ namespace gak
 					}
 					StringTokens tokens;
 					{
+						doEnterFunctionEx(gakLogging::llInfo,"indexer::processor");
 						StringIndexPtr index = createStringIndex();
 						tokenString( text, s_stopWords, IS_WORD, &tokens );
 						processPositions(text, tokens, index );
@@ -376,6 +380,7 @@ namespace gak
 
 					if( s_flags & OPT_BRAIN_PATH )
 					{
+						doEnterFunctionEx(gakLogging::llInfo,"brain::learn");
 						static Critical	s_brainCritical;
 
 						CriticalScope	scope( s_brainCritical );
@@ -615,7 +620,7 @@ int main( int , const char *argv[] )
 	StopWatch	stopWatch(true);
 	doEnableLogEx( gakLogging::llInfo );
 	//doDisableLog();
-	doEnableProfile(gakLogging::llInfo);
+	doEnableProfile(gakLogging::llDetail);
 	doEnterFunctionEx(gakLogging::llInfo, "main");
 
 	int result = EXIT_FAILURE;
