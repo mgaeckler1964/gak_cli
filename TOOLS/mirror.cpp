@@ -63,6 +63,7 @@
 #include <gak/numericString.h>
 #include <gak/acls.h>
 #include <gak/eta.h>
+#include <gak/mboxParser.h>
 
 // --------------------------------------------------------------------- //
 // ----- imported datas ------------------------------------------------ //
@@ -89,12 +90,14 @@ const int FLAG_DO_LOG		= 0x020;
 const int FLAG_CREATE_TREE	= 0x040;
 const int OPT_MAX_AGE		= 0x080;
 const int OPT_MAX_QUEUE		= 0x100;
+const int FLAG_FATAL_MAIL	= 0x200;
 
 const int CHAR_DO_COMPARE	= 'C';
 const int CHAR_DO_LOG		= 'L';
 const int CHAR_CREATE_TREE	= 'T';
 const int CHAR_MAX_AGE		= 'A';
 const int CHAR_MAX_QUEUE	= 'Q';
+const int CHAR_FATAL_MAIL	= 'M';
 
 const int COUNT_WIDTH		= 6;
 const int LOCK_WIDTH		= 2;
@@ -115,6 +118,7 @@ static CommandLine::Options options[] =
 	{ CHAR_CREATE_TREE,	"createTree",	0, 1, FLAG_CREATE_TREE },
 	{ CHAR_MAX_AGE,		"maxAge",		0, 1, OPT_MAX_AGE|CommandLine::needArg,	"<max age in day of backup files>" },
 	{ CHAR_MAX_QUEUE,	"maxQueueLen",	0, 1, OPT_MAX_QUEUE|CommandLine::needArg,	"<max length of process queues>" },
+	{ CHAR_FATAL_MAIL,	"fatalMail",	0, 1, FLAG_FATAL_MAIL,	"send mail in case of fatal error" },
 	{ 0 }
 };
 
@@ -258,13 +262,14 @@ class CopyFilterThread : public CollectorBase
 	STRING						m_destinationPath;
 	bool						m_archiveMode;
 	bool						m_compareMode;
+	bool						m_fatalMailMode;
 	std::size_t					m_checkCount;
 
 	public:
 	CopyFilterThread(
 		SharedObjectPointer<CollectorThread> srcCollector,
 		SharedObjectPointer<CollectorThread> dstCollector,
-		const STRING &dest, bool archiveMode, bool compareMode,
+		const STRING &dest, bool archiveMode, bool compareMode, bool fatalMailMode,
 		std::size_t maxQueueLen
 	)
 	: CollectorBase( maxQueueLen ),
@@ -273,6 +278,7 @@ class CopyFilterThread : public CollectorBase
 	m_destinationPath(dest),
 	m_archiveMode(archiveMode),
 	m_compareMode(compareMode),
+	m_fatalMailMode(fatalMailMode),
 	m_checkCount(0)
 	{
 		StartThread("CopyFilterThread");
@@ -352,6 +358,7 @@ class CopyThread : public Thread
 	std::size_t	  								m_count, m_errorCount, m_aclErrorCount;
 	SharedObjectPointer<CopyFilterThread>		m_filter;
 	bool										m_archiveMode;
+	bool										m_fatalMailMode;
 	TreeCreator									*m_theTreeCreator;
 	TreeMap<FileID,STRING>						m_copiedFiles;
 	unsigned									m_permille;
@@ -391,15 +398,16 @@ class CopyThread : public Thread
 	CopyThread(
 		SharedObjectPointer<CopyFilterThread> theFilter,
 		bool archiveMode,
+		bool fatalMailMode,
 		TreeCreator *theTreeCreator
-	) : m_filter(theFilter)
+	) : 
+	m_startTick(0), 
+	m_count(0), m_errorCount(0), m_aclErrorCount(0), 
+	m_filter(theFilter), 
+	m_archiveMode(archiveMode), m_fatalMailMode(fatalMailMode), 
+	m_theTreeCreator(theTreeCreator), 
+	m_permille(0), m_totalBytes(0)
 	{
-		m_startTick = 0;
-		m_totalBytes = 0;
-		m_aclErrorCount = m_errorCount = m_count = 0;
-		m_permille = 0;
-		m_archiveMode = archiveMode;
-		m_theTreeCreator = theTreeCreator;
 		StartThread("CopyThread");
 	}
 	virtual void ExecuteThread( void );
@@ -678,7 +686,7 @@ static void deleteOldBackups( const STRING &destination, int maxAge, bool create
 
 static void mirror(
 	const STRING &source, const STRING &destination,
-	int maxAge, bool createTree, bool doLog, bool compareMode,
+	int maxAge, bool fatalMailMode, bool createTree, bool doLog, bool compareMode,
 	std::size_t maxQueueLen
 )
 {
@@ -718,7 +726,7 @@ static void mirror(
 	SharedObjectPointer<CopyFilterThread>		theCopyFilter = new CopyFilterThread(
 		theSourceCollector,
 		maxQueueLen ? SharedObjectPointer<CollectorThread>() : theDestCollector,
-		destination, maxAge > 0, compareMode, maxQueueLen
+		destination, maxAge > 0, compareMode, fatalMailMode, maxQueueLen
 	);
 
 	SharedObjectPointer<DeleteThread>			theDeleteConsumer = new DeleteThread(
@@ -726,7 +734,7 @@ static void mirror(
 	);
 
 	SharedObjectPointer<CopyThread>			theCopyConsumer = new CopyThread(
-		theCopyFilter, maxAge > 0, theTreeCreator.get()
+		theCopyFilter, maxAge > 0, fatalMailMode, theTreeCreator.get()
 	);
 
 	const DirectoryQueue	&destQueue = theDestCollector->getQueue();
@@ -956,7 +964,7 @@ static int mirror( const CommandLine &cmdLine )
 
 	mirror(
 		source, destination,
-		maxAge, createTree, doLog, doCompare, maxQueueLen
+		maxAge, cmdLine.flags & FLAG_FATAL_MAIL, createTree, doLog, doCompare, maxQueueLen
 	);
 
 	return EXIT_SUCCESS;
@@ -1213,6 +1221,7 @@ void CopyFilterThread::ExecuteThread( void )
 									}
 								}
 							}
+
 							m_errorCount++;
 							checkError = true;
 						}
@@ -1234,6 +1243,10 @@ void CopyFilterThread::ExecuteThread( void )
 					if( checkError )
 					{
 						errFile << reason << std::endl;
+						if( m_fatalMailMode )
+						{
+							mail::appendMail( "Check error " + theSourceFile + '/' + theDestFile, reason );
+						}
 					}
 				}
 			}
@@ -1490,12 +1503,20 @@ void CopyThread::ExecuteThread()
 				catch( std::exception &e )
 				{
 					m_errorCount++;
-					errFile << "Copy " << theSourceFile.fileName << " to " << theDestFile << ": " << e.what() << std::endl;
+					STRING errorMessage = STRING("Copy ") + theSourceFile.fileName + " to " + theDestFile + ": " + e.what();
+					errFile << errorMessage << std::endl;
 					logEntry = "Error copy ";
 					logEntry += theSourceFile.fileName;
 					logEntry += " to ";
 					logEntry += theDestFile;
 					s_logStrings.push( logEntry );
+					if( m_fatalMailMode )
+					{
+						STRING mailSubject = STRING("mirror copy error: ") + theSourceFile.fileName;
+						errorMessage += '\n';
+						errorMessage += logEntry;
+						mail::appendMail( mailSubject, errorMessage );
+					}
 				}
 
 				try
