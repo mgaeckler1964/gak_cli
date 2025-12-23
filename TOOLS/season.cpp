@@ -1,7 +1,7 @@
 /*
-		Project:		
-		Module:			
-		Description:	
+		Project:		GAK_CLI
+		Module:			season.cpp
+		Description:	Show next summer, winter, moon etc.
 		Author:			Martin Gäckler
 		Address:		Hofmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/

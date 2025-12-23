@@ -105,14 +105,14 @@ public:
 	MapMails				m_theMap;
 	size_t					m_mailCount;
 
-	DupMailProcessor(const gak::CommandLine	&cmdLine)  : gak::FileProcessor(cmdLine), m_mailCount(0)
+	DupMailProcessor(const gak::CommandLine	&cmdLine) : gak::FileProcessor(cmdLine), m_mailCount(0)
 	{
 	}
 	void start( const gak::STRING &path )
 	{
 		std::cout << "start: " << path << std::endl;
 	}
-	void process( const gak::STRING &file )
+	void process( const gak::DirectoryEntry &entry, const gak::STRING &file )
 	{
 		Mails	theMails;
 		std::cout << "process: " << file << std::endl;
