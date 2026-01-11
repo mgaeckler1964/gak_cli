@@ -210,10 +210,10 @@ class TheProcessor : public FileProcessor
 
 static CommandLine::Options options[] =
 {
-	{ CHAR_MAIL_REPORT,		"fatalMail",		0, 1, FLAG_MAIL_REPORT,		"send mail in case of extreme size change" },
-	{ CHAR_FOLLOW_REPARSE,	"followReparse",	0, 1, FLAG_FOLLOW_REPARSE,	"follow reparse points" },
-	{ CHAR_VERBOSE,			"verbose",			0, 1, FLAG_VERBOSE,			"list directory stats" },
-	{ CHAR_UPDATE,			"update",			0, 1, FLAG_UPDATE,			"update database" },
+	{ CHAR_MAIL_REPORT,		"fatalMail",		0, 1,	FLAG_MAIL_REPORT,					"send mail in case of extreme size change" },
+	{ CHAR_FOLLOW_REPARSE,	"followReparse",	0, 1,	FLAG_FOLLOW_REPARSE,				"follow reparse points" },
+	{ CHAR_VERBOSE,			"verbose",			0, 1,	FLAG_VERBOSE,						"list directory stats" },
+	{ CHAR_UPDATE,			"update",			0, -1,	FLAG_UPDATE|CommandLine::needArg,	"<dir> update database entry" },
 	{ 0 }
 };
 
@@ -290,17 +290,26 @@ static void treeSize( const CommandLine &cmdLine, const STRING &root )
 					formatNumber(it->m_fileCount) + " files " + formatNumber(it->m_dirCount) + " directories " + formatNumber(it->m_treeSize) + " bytes\n"
 					" (old)" + formatNumber(old.m_fileCount) + " files " + formatNumber(old.m_dirCount) + " directories " + formatNumber(old.m_treeSize) + " bytes\n" +
 					warningText;
+
+				if( cmdLine.flags & FLAG_UPDATE )
+				{
+					const ArrayOfStrings &params = cmdLine.parameter[CHAR_UPDATE];
+					if( params.hasElement(it->m_name) ) 
+					{
+						hasChanged = true;
+						old.m_dirCount = it->m_dirCount;
+						old.m_fileCount = it->m_fileCount;
+						old.m_treeSize = it->m_treeSize;
+					}
+					else
+						messageText += "\nNo updating.";
+				}
+
 				std::cout << messageText << std::endl;
 
 				if( cmdLine.flags & FLAG_MAIL_REPORT )
 					mail::appendMail("treeSize warning",messageText);
-				if( cmdLine.flags & FLAG_UPDATE )
-				{
-					hasChanged = true;
-					old.m_dirCount = it->m_dirCount;
-					old.m_fileCount = it->m_fileCount;
-					old.m_treeSize = it->m_treeSize;
-				}
+
 			}
 		}
 		else
