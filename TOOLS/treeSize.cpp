@@ -95,9 +95,9 @@ struct TreeEntry
 	typedef STRING key_type;
 
 	STRING			m_name;
-	size_t			m_treeSize;
-	size_t			m_fileCount;
-	size_t			m_dirCount;
+	uint64			m_treeSize;
+	uint64			m_fileCount;
+	uint64			m_dirCount;
 
 	const STRING &getKey() const
 	{
@@ -174,7 +174,7 @@ class TheProcessor : public FileProcessor
 	{
 		try
 		{
-			size_t			size = theEntry.fileSize;
+			uint64			size = theEntry.fileSize;
 
 			size_t	currentItem = m_currentItem;
 			while( currentItem != m_directoryTree.no_index )
@@ -244,6 +244,15 @@ static void treeSize( const CommandLine &cmdLine, const STRING &root )
 	STRING sizeFile = root;
 	sizeFile.condAppend(DIRECTORY_DELIMITER);
 	sizeFile +=  ".treeSize"; 
+	STRING updateFile = sizeFile;
+	updateFile += ".update";
+	ArrayOfStrings updateList;
+
+	if( exists( updateFile ) )
+	{
+		updateList.readFromFile(updateFile);
+	}
+	size_t numFileUpdates = updateList.size();
 
 	Map<TreeEntry>	theTreeSize;
 
@@ -291,15 +300,16 @@ static void treeSize( const CommandLine &cmdLine, const STRING &root )
 					" (old)" + formatNumber(old.m_fileCount) + " files " + formatNumber(old.m_dirCount) + " directories " + formatNumber(old.m_treeSize) + " bytes\n" +
 					warningText;
 
-				if( cmdLine.flags & FLAG_UPDATE )
+				if( (cmdLine.flags & FLAG_UPDATE) || updateList.hasElement(it->m_name) )
 				{
-					const ArrayOfStrings &params = cmdLine.parameter[CHAR_UPDATE];
-					if( params.hasElement(it->m_name) ) 
+					if( updateList.hasElement(it->m_name) || cmdLine.parameter[CHAR_UPDATE].hasElement(it->m_name) ) 
 					{
 						hasChanged = true;
 						old.m_dirCount = it->m_dirCount;
 						old.m_fileCount = it->m_fileCount;
 						old.m_treeSize = it->m_treeSize;
+						updateList.removeElementVal(it->m_name);
+						messageText += "\nupdating.";
 					}
 					else
 						messageText += "\nNo updating.";
@@ -325,6 +335,14 @@ static void treeSize( const CommandLine &cmdLine, const STRING &root )
 
 		writeToBinaryFile( sizeFile, theTreeSize, magic, version, owmOverwrite );
 	}
+	if( numFileUpdates != updateList.size() )
+	{
+		if( updateList.size() )
+			updateList.writeToFile( updateFile );
+		else
+			strRemove( updateFile );
+	}
+
 	std::cout << "ready " << sw.get<Minutes<> >().toString() << std::endl;
 }
 
