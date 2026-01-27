@@ -42,6 +42,7 @@
 
 #include <gak/datetime.h>
 #include <gak/stringStream.h>
+#include <gak/cmdlineParser.h>
 
 // --------------------------------------------------------------------- //
 // ----- imported datas ------------------------------------------------ //
@@ -61,6 +62,10 @@
 // --------------------------------------------------------------------- //
 // ----- constants ----------------------------------------------------- //
 // --------------------------------------------------------------------- //
+
+const int OPT_LOCATION	= 0x010;
+const int CHAR_LOCATION	= 'L';
+
 
 // --------------------------------------------------------------------- //
 // ----- macros -------------------------------------------------------- //
@@ -102,6 +107,11 @@ const char *seasons[] =
 	"", "Fr\x81hling", "Sommer", "Herbst", "Winter"
 };
 
+static gak::CommandLine::Options options[] =
+{
+	{ CHAR_LOCATION,	"location",	0, 1, OPT_LOCATION|gak::CommandLine::needArg,	"<your location>" },
+	{ 0 }
+};
 
 // --------------------------------------------------------------------- //
 // ----- class static data --------------------------------------------- //
@@ -177,7 +187,7 @@ static void showTimeLeft( gak::DateTime now, gak::DateTime event, const char *ev
 	std::cout << std::endl;
 }
 
-static void season()
+static void season(double longitude, double latitude )
 {
 	doEnterFunctionEx(gakLogging::llInfo, "season");
 	static gak::PODarray<std::size_t>	s_lineLens;
@@ -186,6 +196,13 @@ static void season()
 	gak::DateTime now;
 	gak::DateTime::Season	season = now.getSeason();
 	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now << ' ' << seasons[season] << "     " << std::endl;
+
+	if( longitude && latitude )
+	{
+		gak::DateTime	sunrise, sunset;
+		now.sunriseEquation( longitude, latitude, &sunrise, &sunset );
+		std::cout << "Sonnenaufgang: " << sunrise << " -untergang: " << sunset << std::endl;
+	}
 
 	showTimeLeft( now, gak::DateTime::uptime(), "Rechnerstart", &s_lineLens[line++] );
 
@@ -275,34 +292,65 @@ static void season()
 // ----- entry points -------------------------------------------------- //
 // --------------------------------------------------------------------- //
 
-int main()
+int main( int, const char *argv[] )
 {
 	doEnableLogEx( gakLogging::llInfo );
 	//doDisableLog();
 	doEnterFunctionEx(gakLogging::llInfo, "main");
-#ifdef __WINDOWS__
-	system("cls");
-	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-	COORD coord = { 0,0 };
-#ifndef NDEBUG
-	for( int i=0; i<7; ++i )
-#else
-	while( 1 )
-#endif
+
+	try
 	{
-		SetConsoleCursorPosition( hConsole, coord );
-		season();
-#if 0
-		gak::DateTime now;
-		unsigned sec = now.getSecond();
-		Sleep( (10 - sec%10) *1000 );
+		gak::CommandLine cmdLine( options, argv );
+		double longitude = 0, latitude = 0;
+
+		if( cmdLine.flags & OPT_LOCATION )
+		{
+			gak::ArrayOfStrings	location;
+			gak::STRING			locStr = cmdLine.parameter[CHAR_LOCATION][0];
+			location.createElements( locStr, "," );
+			longitude = location[0].getValueE<double>();
+			latitude = location[1].getValueE<double>();
+		}
+
+#ifdef __WINDOWS__
+		system("cls");
+		HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+		COORD coord = { 0,0 };
+#	ifndef NDEBUG
+		for( int i=0; i<7; ++i )
+#	else
+		while( 1 )
+#	endif
+		{
+			SetConsoleCursorPosition( hConsole, coord );
+			season(longitude, latitude);
+#	if 0
+			gak::DateTime now;
+			unsigned sec = now.getSecond();
+			Sleep( (10 - sec%10) *1000 );
+#	else
+			Sleep( 10000 );
+#endif
+		}
 #else
-		Sleep( 10000 );
+		season(longitude, latitude);
 #endif
 	}
-#else
-	season();
-#endif
+	catch( gak::CmdlineError &e )
+	{
+		std::cerr << argv[0] << ": " << e.what() << std::endl;
+		std::cerr << "Usage: " << argv[0] << " <options>\n" << options;
+	}
+	catch( std::exception &e )
+	{
+		std::cerr << argv[0] << ": " << e.what() << std::endl;
+	}
+	catch( ... )
+	{
+		std::cerr << argv[0] << ": Unkown error" << std::endl;
+	}
+
+
 }
 
 #ifdef __BORLANDC__
