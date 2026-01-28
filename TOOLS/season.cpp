@@ -43,6 +43,7 @@
 #include <gak/datetime.h>
 #include <gak/stringStream.h>
 #include <gak/cmdlineParser.h>
+#include <gak/numericString.h>
 
 // --------------------------------------------------------------------- //
 // ----- imported datas ------------------------------------------------ //
@@ -194,8 +195,12 @@ static void season(double longitude, double latitude )
 
 	size_t line=0;
 	gak::DateTime now;
+#if NO_SEASON
+	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now <<  "     " << std::endl;
+#else
 	gak::DateTime::Season	season = now.getSeason();
 	std::cout << "Jetzt ist " << now.weekDayName() << ' ' << now << ' ' << seasons[season] << "     " << std::endl;
+#endif
 
 	if( longitude && latitude )
 	{
@@ -206,6 +211,7 @@ static void season(double longitude, double latitude )
 
 	showTimeLeft( now, gak::DateTime::uptime(), "Rechnerstart", &s_lineLens[line++] );
 
+#if !NO_SEASON
 	gak::DateTime	nextSpring = now.nextSpring();
 	gak::DateTime	nextSummer = now.nextSummer();
 	if (nextSpring < nextSummer )
@@ -258,6 +264,7 @@ static void season(double longitude, double latitude )
 	time_t	fullPhase = next-last;
 	int		moonPercent = int(100.0*moonLevelTime/fullPhase +0.5);
 	std::cout << moonPercent << "% Mondphase   " << std::endl;
+#endif
 }
 
 // --------------------------------------------------------------------- //

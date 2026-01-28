@@ -21,7 +21,11 @@ TOOLS=\
 	${OUTDIR}/mboxSearch \
 	${OUTDIR}/minMax \
 	${OUTDIR}/mirror \
-	${OUTDIR}/tdiff
+	${OUTDIR}/season \
+	${OUTDIR}/tdiff \
+	${OUTDIR}/treeSize \
+	${OUTDIR}/twins
+#	${OUTDIR}/xmlGalery		not yet ported to linux
 
 
 build: ${TOOLS}
@@ -65,7 +69,16 @@ ${OUTDIR}/minMax: TOOLS/minMax.cpp ${GAKLIB}
 ${OUTDIR}/mirror: TOOLS/mirror.cpp ${GAKLIB}
 	g++ ${CFLAGS} -lpthread -o $@ $^ ${SSLLIB}
 
+${OUTDIR}/season: TOOLS/season.cpp ${GAKLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^ ${SSLLIB}
+
 ${OUTDIR}/tdiff: TOOLS/tdiff.cpp ${GAKLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^ 
+
+${OUTDIR}/treeSize: TOOLS/treeSize.cpp ${GAKLIB}
+	g++ ${CFLAGS} -lpthread -o $@ $^ 
+
+${OUTDIR}/twins: TOOLS/twins.cpp ${GAKLIB}
 	g++ ${CFLAGS} -lpthread -o $@ $^ 
 
 ${OUTDIR}/xmlGalery: TOOLS/xmlGalery.cpp ${GAKLIB}

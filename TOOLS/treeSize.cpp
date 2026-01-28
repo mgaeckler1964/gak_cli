@@ -210,10 +210,10 @@ class TheProcessor : public FileProcessor
 
 static CommandLine::Options options[] =
 {
-	{ CHAR_MAIL_REPORT,		"fatalMail",		0, 1,	FLAG_MAIL_REPORT,					"send mail in case of extreme size change" },
-	{ CHAR_FOLLOW_REPARSE,	"followReparse",	0, 1,	FLAG_FOLLOW_REPARSE,				"follow reparse points" },
-	{ CHAR_VERBOSE,			"verbose",			0, 1,	FLAG_VERBOSE,						"list directory stats" },
-	{ CHAR_UPDATE,			"update",			0, -1,	FLAG_UPDATE|CommandLine::needArg,	"<dir> update database entry" },
+	{ CHAR_MAIL_REPORT,		"fatalMail",		0, 1,				FLAG_MAIL_REPORT,					"send mail in case of extreme size change" },
+	{ CHAR_FOLLOW_REPARSE,	"followReparse",	0, 1,				FLAG_FOLLOW_REPARSE,				"follow reparse points" },
+	{ CHAR_VERBOSE,			"verbose",			0, 1,				FLAG_VERBOSE,						"list directory stats" },
+	{ CHAR_UPDATE,			"update",			0, unsigned(-1),	FLAG_UPDATE|CommandLine::needArg,	"<dir> update database entry" },
 	{ 0 }
 };
 
