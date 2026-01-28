@@ -50,7 +50,7 @@ search for a word in the mailbox search index
 find largest, smallest, oldest newwest files
 
 *mirror*
-create a mirror for a directopry, presevere changed files for a while
+create a mirror for a directory, presevere changed files for a while
 
 *pathenv*
 create environment variables for the user shell folders
@@ -72,7 +72,7 @@ like unix tail
 compare two text files
 
 *treeSize*
-checks all sizes for all directories of a drive. If a directory grows two much, a mail is appended to an mbox file
+checks all sizes for all directories of a drive. If a directory grows too much, a mail is appended to an mbox file. My crontab starts this programm every day so I can identitfy the space wasting applications and delete stupid stuff.
 
 *twins*
 searches for duplicate files
