@@ -78,6 +78,9 @@ const int CHAR_UPDATE			= 'U';
 static const uint32 magic = ('D'<<24) | ('i'<<16) | ('T'<<8) | 'r';
 static const uint16 version = 1;
 
+#define TREE_SIZE	".treeSize"
+#define UPDATE		".update"
+
 // --------------------------------------------------------------------- //
 // ----- macros -------------------------------------------------------- //
 // --------------------------------------------------------------------- //
@@ -243,11 +246,15 @@ static void treeSize( const CommandLine &cmdLine, const STRING &root )
 
 	STRING sizeFile = root;
 	sizeFile.condAppend(DIRECTORY_DELIMITER);
-	sizeFile +=  ".treeSize"; 
+	sizeFile +=  TREE_SIZE; 
 	STRING updateFile = sizeFile;
-	updateFile += ".update";
+	updateFile += UPDATE;
 	ArrayOfStrings updateList;
 
+	if( !exists( updateFile ) )
+	{
+		updateFile = getGlobalConfig() + DIRECTORY_DELIMITER_STRING TREE_SIZE UPDATE;
+	}
 	if( exists( updateFile ) )
 	{
 		updateList.readFromFile(updateFile);
