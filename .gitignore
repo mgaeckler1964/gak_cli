@@ -37,6 +37,7 @@
 *.ipch
 *.sdf
 *.suo
+*.opensdf
 
 alt.txt
 neu.txt
