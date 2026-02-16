@@ -303,7 +303,7 @@ static int hash( const CommandLine &cmdLine )
 
 	if( !hashFile.isEmpty() && isFile( hashFile ) )
 	{
-		readFromBinaryFile( hashFile, &allDigests, magic, version, false );
+		readFromBinaryFile( hashFile, &allDigests, magic, version, true );	// skip size comparision
 	}
 
 	while( (arg = *argv++) != NULL )
