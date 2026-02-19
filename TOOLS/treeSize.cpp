@@ -303,8 +303,8 @@ static void treeSize( const CommandLine &cmdLine, const STRING &root )
 			if( !warningText.isEmpty() )
 			{
 				STRING messageText = it->m_name + '\n' + 
-					formatNumber(it->m_fileCount) + " files " + formatNumber(it->m_dirCount) + " directories " + formatNumber(it->m_treeSize) + " bytes\n"
-					" (old)" + formatNumber(old.m_fileCount) + " files " + formatNumber(old.m_dirCount) + " directories " + formatNumber(old.m_treeSize) + " bytes\n" +
+					formatNumber(it->m_fileCount) + " files " + formatNumber(it->m_dirCount) + " directories " + formatNumber(it->m_treeSize, 0, 0, ' ') + " bytes\n"
+					" (old)" + formatNumber(old.m_fileCount) + " files " + formatNumber(old.m_dirCount) + " directories " + formatNumber(old.m_treeSize, 0, 0, ' ') + " bytes\n" +
 					warningText;
 
 				if( (cmdLine.flags & FLAG_UPDATE) || updateList.hasElement(it->m_name) )
