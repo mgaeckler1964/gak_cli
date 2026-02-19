@@ -47,10 +47,10 @@ read all mbox files and create a search index and a word matrix
 search for a word in the mailbox search index
 
 *minMax*
-find largest, smallest, oldest newwest files
+find largest, smallest, oldest and newwest files
 
 *mirror*
-create a mirror for a directory, presevere changed files for a while
+create a mirror for a directory, archive changed files for a specified period
 
 *pathenv*
 create environment variables for the user shell folders
