@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="setBdeConfig.c">
+    <ClCompile Include="setBdeConfig.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
