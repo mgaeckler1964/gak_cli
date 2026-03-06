@@ -60,10 +60,8 @@ int main()
 	);
 	environmentKey.openPrivate( "Environment", KEY_ALL_ACCESS );
 
-	RegValuePairs values;
-	shellFolderKey.getValuePairs( &values );
 	for( 
-		RegValuePairs::const_iterator it = values.cbegin(), endIT = values.cend();
+		Registry::value_iterator it = shellFolderKey.vbegin(), endIT = shellFolderKey.vend();
 		it != endIT;
 		++it
 	)
