@@ -39,8 +39,9 @@
 *.suo
 *.opensdf
 
-alt.txt
-neu.txt
+Alt.txt
+Neu.txt
+adaptCopy.cpp
 *.bak
 
 # test scripts

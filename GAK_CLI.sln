@@ -55,6 +55,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "clichess", "TOOLS\clichess.
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "treeSize", "TOOLS\treeSize.vcxproj", "{519F098A-227D-4BA0-95D3-00FB42A52A81}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "adapt", "TOOLS\adapt.vcxproj", "{6401CD7D-7227-4E23-8D9F-B6C14A4130C4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -277,6 +279,14 @@ Global
 		{519F098A-227D-4BA0-95D3-00FB42A52A81}.Release|Win32.Build.0 = Release|Win32
 		{519F098A-227D-4BA0-95D3-00FB42A52A81}.Release|x64.ActiveCfg = Release|x64
 		{519F098A-227D-4BA0-95D3-00FB42A52A81}.Release|x64.Build.0 = Release|x64
+		{6401CD7D-7227-4E23-8D9F-B6C14A4130C4}.Debug|Win32.ActiveCfg = Debug|Win32
+		{6401CD7D-7227-4E23-8D9F-B6C14A4130C4}.Debug|Win32.Build.0 = Debug|Win32
+		{6401CD7D-7227-4E23-8D9F-B6C14A4130C4}.Debug|x64.ActiveCfg = Debug|x64
+		{6401CD7D-7227-4E23-8D9F-B6C14A4130C4}.Debug|x64.Build.0 = Debug|x64
+		{6401CD7D-7227-4E23-8D9F-B6C14A4130C4}.Release|Win32.ActiveCfg = Release|Win32
+		{6401CD7D-7227-4E23-8D9F-B6C14A4130C4}.Release|Win32.Build.0 = Release|Win32
+		{6401CD7D-7227-4E23-8D9F-B6C14A4130C4}.Release|x64.ActiveCfg = Release|x64
+		{6401CD7D-7227-4E23-8D9F-B6C14A4130C4}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
