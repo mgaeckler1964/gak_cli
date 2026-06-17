@@ -42,6 +42,7 @@
 
 #include <gak/gaklib.h>
 #include <gak/stdlib.h>
+#include <gak/tmpfile.h>
 
 #include <winlib/registry.h>
 
@@ -171,31 +172,24 @@ int main( int argc, const char *argv[] )
 			gak::Buffer<char> bdeWasteBuffer( safety );
 			if( bdeWasteBuffer )
 			{
-				char	*tmp = getenv("TMP");
-				if( tmp )
+				gak::STRING	path = gak::TempFileName::buildUniqueName( true );
+				if( !path.isEmpty() )
 				{
-					char		tmpfile[1024];
-
-					tmpnam(tmpfile);
-
-					gak::STRING	path = gak::STRING(tmp) + tmpfile;
+					std::cout << "create file " << path << ' ' << safety << std::endl;
+					std::ofstream fp(path, std::ios_base::binary);
+					if( fp.is_open() )
 					{
-						std::cout << "create file " << path << ' ' << safety << std::endl;
-						std::ofstream fp(path, std::ios_base::binary);
-						if( fp.is_open() )
+						fp.write(bdeWasteBuffer, safety );
+						if( fp.bad() )
 						{
-							fp.write(bdeWasteBuffer, safety );
-							if( fp.bad() )
-							{
-								std::cerr << "Cannot write" << std::endl;
-								success = false;
-							}
-						}
-						else
-						{
-							std::cerr << "Cannot create file " << path << std::endl;
+							std::cerr << "Cannot write" << std::endl;
 							success = false;
 						}
+					}
+					else
+					{
+						std::cerr << "Cannot create file " << path << std::endl;
+						success = false;
 					}
 				}
 				else

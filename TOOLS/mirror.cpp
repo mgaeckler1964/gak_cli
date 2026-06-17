@@ -6,7 +6,7 @@
 		Address:		Hofmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/
 
-		Copyright:		(c) 1988-2025 Martin Gäckler
+		Copyright:		(c) 1988-2026 Martin Gäckler
 
 		This program is free software: you can redistribute it and/or modify  
 		it under the terms of the GNU General Public License as published by  
@@ -235,14 +235,16 @@ class CollectorThread : public CollectorBase
 		if( m_backupPath.isEmpty() )
 		{
 			DateTime	latestDate = m_latestDate.calcOriginalTime();
-			char	 	nowC[64];
 
-			sprintf(
-				nowC,
-				"%04d_%02d_%02d_%02d_%02d_%02d",
-				latestDate.getYear(), (int)latestDate.getMonth(), latestDate.getDay(),
-				latestDate.getHour(), latestDate.getMinute(), latestDate.getSecond()
-			);
+			gak::NumberBuffer tmp[6];
+			STRING	 	nowC = STRING()
+				.add(formatNumberFast(tmp,latestDate.getYear(), 4, '0')).add('_')
+				.add(formatNumberFast(tmp+1,int(latestDate.getMonth()), 2, '0')).add('_')
+				.add(formatNumberFast(tmp+2,latestDate.getDay(), 2, '0')).add('_')
+				.add(formatNumberFast(tmp+2,latestDate.getHour(), 2, '0')).add('_')
+				.add(formatNumberFast(tmp+2,latestDate.getMinute(), 2, '0')).add('_')
+				.add(formatNumberFast(tmp+2,latestDate.getSecond(), 2, '0'))
+			;
 			const_cast<CollectorThread*>(this)->m_backupPath = m_sourcePath + nowC;
 			s_logStrings.push( STRING("Latest File: ") + m_latestFile );
 		}
@@ -1561,7 +1563,7 @@ void DeleteThread::ExecuteThread()
 			deleteQueue.getLocker().lock();
 			inputLocked = true;
 		}
-		bool waited;
+		bool waited=false;
 		if( (deleteQueue.size()>0) || (waited=deleteQueue.wait(2000))==true )
 		{
 			DirectoryEntry theDestFile = deleteQueue.pop();

@@ -3,10 +3,10 @@
 		Module:			xmlgalery.cpp
 		Description:	Scan a directory and generate an XML file with all images that can be parsed with an XSL processor
 		Author:			Martin Gäckler
-		Address:		Hopfengasse 15, A-4020 Linz
+		Address:		Hofmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/
 
-		Copyright:		(c) 1988-2021 Martin Gäckler
+		Copyright:		(c) 1988-2026 Martin Gäckler
 
 		This program is free software: you can redistribute it and/or modify  
 		it under the terms of the GNU General Public License as published by  
@@ -15,7 +15,7 @@
 		You should have received a copy of the GNU General Public License 
 		along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Germany, Munich ``AS IS''
+		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Linz, Austria ``AS IS''
 		AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
 		TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
 		PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR
@@ -102,7 +102,7 @@ static void makeImageTable( xml::Element *imgTable )
 {
 	int						i, colCount;
 	STRING					fileName, destFileName, href;
-	xml::Any				*table, *tr, *img;
+	xml::Any				*table, *tr = nullptr, *img;
 	WIN32_FIND_DATA			findData;
 	SortedArray<CI_STRING>	fileNames;
 
@@ -169,7 +169,6 @@ static void makeImageTable( xml::Element *imgTable )
 		}
 		for( i=0; i<(int)fileNames.size(); i++ )
 		{
-
 			if( i%colCount == 0 )
 				tr = static_cast<xml::Any *>(table->addObject( new xml::Any( "tr" ) ));
 
@@ -187,7 +186,7 @@ static void makeImageTable( xml::Element *imgTable )
 
 			destFileName = destPath;
 			destFileName += fileNames[i];
-			if( !access( destFileName, 04 ) )
+			if( !strAccess( destFileName, 04 ) )
 			{
 				destFileName.replaceChar( '\\', '/' );
 				xml::Any *anchor = static_cast<xml::Any*>(td->addObject( new xml::Any( "a" ) ));
@@ -310,15 +309,8 @@ int main( int argc, const char *argv[] )
 		makeImageTable( imgTables[i] );
 	}
 
-	STRING xmlResult = theXmlTemplate->generateDoc();
-
-	FILE *fp = fopen( xmlOutput, "w" );
-	if( fp )
-	{
-		fputs( (const char*)xmlResult, fp );
-		fclose( fp );
-	}
-
+	std::ofstream	out( xmlOutput );
+	out << theXmlTemplate->generateDoc();
 
 	return 0;
 }
