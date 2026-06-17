@@ -33,9 +33,12 @@
 /* ----- includes ------------------------------------------------------ */
 /* --------------------------------------------------------------------- */
 
-#include <stdio.h>
+#include <fstream>
 
 #include <gak/gaklib.h>
+#include <gak/string.h>
+#include <gak/exception.h>
+
 #include <gak/io.h>
 
 #ifdef _Windows
@@ -49,9 +52,6 @@
 
 int main( int argc, const char *argv[] )
 {
-	gak::STRING	result;
-	FILE		*fp;
-
 #ifndef NDEBUG
 	const char *_argv[] = {
 		"tdiff",
@@ -59,35 +59,45 @@ int main( int argc, const char *argv[] )
 //		"f:\\source\\gaklib\\ctools\\diff_test2.txt",
 		"f:\\source\\gak_cli\\Alt.txt",
 		"f:\\source\\gak_cli\\Neu.txt",
-		"g:\\temp\\gak\\diff.txt",
+		"c:\\temp\\gak\\diff.txt",
 		NULL
 	};
 	argc = 4;
 	argv = _argv;
 #endif
+	int result = 0;
 	if( argc < 3 || argc > 4 )
-		puts( "Bad number of arguments" );
+	{
+		std::cerr << "Bad number of arguments" << std::endl;
+		result = -1;
+	}
 	else
 	{
-		result = gak::diff( argv[1], argv[2] );
-		fp = argv[3] && *argv[3] ? fopen( argv[3], "w" ) : stdout;
-		if( fp )
+		gak::STRING		fileName	= argv[3] && *argv[3] ? argv[3] : nullptr;
+		gak::STRING		result		= gak::diff( argv[1], argv[2] );
+		std::ofstream	fout;
+		std::ostream	&out		= !fileName.isEmpty() ? (fout.open(fileName), fout) : std::cout;
+		if( out.good() )
 		{
-			fputs( result, fp );
-
-			if( argv[3] && *argv[3] )
-				fclose( fp );
+			out << result;
+		}
+		else
+		{
+			result = -1;
+			if( fileName.isEmpty() )
+				fileName = "<Console>";
+			std::cerr << gak::OpenReadError(fileName).what() << std::endl;
 		}
 	}
 
 #ifdef _Windows
-	if( argc == 4 )
+	if( argc == 4 && !result )
 	{
 		puts( "Executing diff file" );
 		ShellExecute( NULL, "open", argv[3], "", ".", SW_SHOW );
 	}
 #endif
 
-	return 0;
+	return result;
 }
 

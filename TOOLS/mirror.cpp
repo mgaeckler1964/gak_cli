@@ -628,13 +628,11 @@ static void deleteOldBackups( const STRING &destination, int maxAge, bool create
 		CI_STRING name = it->fileName;
 		if( name.beginsWith( dirName ) )
 		{
-			int year, month, day, dummy;
-			year = month = day = 0;
-			sscanf(
-				((const char *)name)+strlen(dirName),
-				"%d_%d_%d_%d_%d_%d",
-				&year, &month, &day, &dummy, &dummy, &dummy
-			);
+			const char *cp	= name.c_str() + strlen(dirName);
+			unsigned year	= getValue<unsigned>(  cp, &cp );
+			unsigned month	= getValue<unsigned>(++cp, &cp );
+			unsigned day	= getValue<unsigned>(++cp, &cp );
+
 			if( year && month && day )
 			{
 				STRING	tree = path;
@@ -660,12 +658,12 @@ static void deleteOldBackups( const STRING &destination, int maxAge, bool create
 				{
 					if( !mergeSrc.isEmpty() )
 					{
-						if( year < now.getYear()-1 && year == lastBackupDate.getYear() )
+						if( year < now.getYear()-1U && year == lastBackupDate.getYear() )
 						{
 							mergeBackups( mergeSrc, tree, createTree );
 						}
-						else if( ( month < now.getMonth()-1 || year < now.getYear() )
-						&& month == lastBackupDate.getMonth()
+						else if( ( month < now.getMonth()-1U || year < now.getYear() )
+						&& month == unsigned(lastBackupDate.getMonth())
 						&& year == lastBackupDate.getYear() )
 						{
 							mergeBackups( mergeSrc, tree, createTree );
