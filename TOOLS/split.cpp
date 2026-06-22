@@ -97,7 +97,7 @@ static int split( const CommandLine &cmdLine )
 	STDfile fpSrc( fileName, "rb" );
 	if( fpSrc )
 	{
-		Buffer<void> fileBuffer( std::malloc( byteCount ) );
+		Buffer<char> fileBuffer( byteCount );
 		if( fileBuffer )
 		{
 			unsigned i = 0;
