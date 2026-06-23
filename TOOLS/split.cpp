@@ -3,10 +3,10 @@
 		Module:			split.cpp
 		Description:	split a file
 		Author:			Martin Gäckler
-		Address:		Hopfengasse 15, A-4020 Linz
+		Address:		Hofmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/
 
-		Copyright:		(c) 1988-2021 Martin Gäckler
+		Copyright:		(c) 1988-2026 Martin Gäckler
 
 		This program is free software: you can redistribute it and/or modify  
 		it under the terms of the GNU General Public License as published by  
@@ -15,7 +15,7 @@
 		You should have received a copy of the GNU General Public License 
 		along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Germany, Munich ``AS IS''
+		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Linz, Austria ``AS IS''
 		AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
 		TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
 		PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR
@@ -33,7 +33,7 @@
 /* ----- includes ------------------------------------------------------ */
 /* --------------------------------------------------------------------- */
 
-#include <iostream>
+#include <fstream>
 
 #include <gak/cmdlineParser.h>
 #include <gak/stdlib.h>
@@ -94,22 +94,24 @@ static int split( const CommandLine &cmdLine )
 	STRING	destName = cmdLine.flags & outputPresent ? cmdLine.parameter['O'][0] : STRING("split");
 	STRING	fileName = cmdLine.argv[1];
 
-	STDfile fpSrc( fileName, "rb" );
+	std::ifstream fpSrc( fileName, std::ios_base::binary );
 	if( fpSrc )
 	{
 		Buffer<char> fileBuffer( byteCount );
 		if( fileBuffer )
 		{
 			unsigned i = 0;
-			while( !feof( fpSrc ) )
+			while( fpSrc )
 			{
 				STRING	dest = destName + formatNumber( ++i, 4 ) + ".spt";
 
-				STDfile	fpDest( dest, "wb" );
+				std::ofstream fpDest;
+				fpDest.open( dest, std::ios_base::binary );
 				if( fpDest )
 				{
-					std::size_t tmpCount = fread( fileBuffer, 1, byteCount, fpSrc );
-					fwrite( fileBuffer, 1, tmpCount, fpDest );
+					fpDest.exceptions(std::ios::failbit | std::ios::badbit);
+					std::size_t tmpCount = size_t(fpSrc.read( fileBuffer, byteCount).gcount());
+					fpDest.write( fileBuffer, tmpCount );
 
 					if( tmpCount < byteCount )
 						break;

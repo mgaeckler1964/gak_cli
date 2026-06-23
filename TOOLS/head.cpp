@@ -3,10 +3,10 @@
 		Module:			head.cpp
 		Description:	print the first lines of a file
 		Author:			Martin Gäckler
-		Address:		Hopfengasse 15, A-4020 Linz
+		Address:		Hofmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/
 
-		Copyright:		(c) 1988-2021 Martin Gäckler
+		Copyright:		(c) 1988-2026 Martin Gäckler
 
 		This program is free software: you can redistribute it and/or modify  
 		it under the terms of the GNU General Public License as published by  
@@ -15,7 +15,7 @@
 		You should have received a copy of the GNU General Public License 
 		along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Germany, Munich ``AS IS''
+		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Linz, Austria ``AS IS''
 		AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
 		TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
 		PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR
@@ -33,7 +33,7 @@
 /* ----- includes ------------------------------------------------------ */
 /* --------------------------------------------------------------------- */
 
-#include <stdio.h>
+#include <fstream>
 
 #include <gak/cmdlineParser.h>
 #include <gak/stdlib.h>
@@ -105,24 +105,22 @@ static int head( const CommandLine &cmdLine )
 	int			lineCount = flags & numLinesPresent ? cmdLine.parameter['N'][0].getValueE<unsigned>() : 25;
 
 	const char	*arg;
-
-	STRING	fileName;
+	STRING		fileName;
 
 	while( (arg = *argv++) != NULL )
 	{
 		fileName = arg;
 
-		STDfile	fp( fileName, "rb" );
-
+		std::ifstream fp( fileName, std::ios_base::binary );
 		if( fp )
 		{
 			int c;
 			int numLines = lineCount;
 
-			while( numLines > 0 && !feof(fp ) )
+			while( numLines > 0 && !fp.eof() )
 			{
-				c = fgetc( fp );
-				if( c == EOF )
+				c = fp.get();
+				if( c == std::char_traits<char>::eof() )
 /*v*/				break;
 				if( c == '\n' )
 					numLines--;
@@ -176,4 +174,3 @@ int main( int , const char *argv[] )
 #	pragma option -a.
 #	pragma option -p.
 #endif
-

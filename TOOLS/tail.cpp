@@ -3,10 +3,10 @@
 		Module:			tail.cpp
 		Description:	print the last lines of a file
 		Author:			Martin Gäckler
-		Address:		Hopfengasse 15, A-4020 Linz
+		Address:		Hofmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/
 
-		Copyright:		(c) 1988-2021 Martin Gäckler
+		Copyright:		(c) 1988-2026 Martin Gäckler
 
 		This program is free software: you can redistribute it and/or modify  
 		it under the terms of the GNU General Public License as published by  
@@ -15,7 +15,7 @@
 		You should have received a copy of the GNU General Public License 
 		along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Germany, Munich ``AS IS''
+		THIS SOFTWARE IS PROVIDED BY Martin Gäckler, Linz, Austria ``AS IS''
 		AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
 		TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
 		PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR
@@ -37,6 +37,7 @@
 // ----- includes ------------------------------------------------------ //
 // --------------------------------------------------------------------- //
 
+#include <fstream>
 #include <cstdlib>
 #include <ctype.h>
 
@@ -138,24 +139,24 @@ static void tailBytes( size_t byteCount )
 {
 	size_t	readBytes;
 
-	char *buffer1 = (char *)malloc( byteCount );
-	char *tmp, *buffer2 = NULL;
+	gak::Buffer<char> buffer1( byteCount );
+	gak::Buffer<char> buffer2, tmp;
 
-	while( !feof( stdin ) )
+	while( !std::cin.eof() )
 	{
-		readBytes = fread(buffer1, 1, byteCount, stdin);
+		readBytes = size_t(std::cin.read(buffer1, byteCount).gcount());
 		if( readBytes == byteCount )
 		{
 			if( !buffer2 )
 			{
-				buffer2 = buffer1;
-				buffer1 = (char *)malloc( byteCount );
+				buffer2.moveFrom( buffer1 );
+				buffer1.resize( byteCount );
 			}
 			else
 			{
-				tmp = buffer2;
-				buffer2 = buffer1;
-				buffer1 = tmp;
+				tmp.moveFrom( buffer2 );
+				buffer2.moveFrom( buffer1 );
+				buffer1.moveFrom( tmp );
 			}
 		}
 		else
@@ -167,8 +168,7 @@ static void tailBytes( size_t byteCount )
 					memcpy( buffer2, buffer2+readBytes,byteCount-readBytes );
 					memcpy( buffer2+byteCount-readBytes, buffer1, readBytes );
 				}
-				free( buffer1 );
-				buffer1 = buffer2;
+				buffer1.moveFrom( buffer2 );
 			}
 			else
 				byteCount = readBytes;
@@ -177,8 +177,7 @@ static void tailBytes( size_t byteCount )
 		}
 	}
 
-	fwrite( buffer1, 1, byteCount, stdout );
-	free( buffer1 );
+	std::cout.write( buffer1, byteCount );
 }
 
 static int tail( const CommandLine &cmdLine )
@@ -196,7 +195,7 @@ static int tail( const CommandLine &cmdLine )
 	{
 		fileName = arg;
 
-		STDfile	fp( fileName, "rb" );
+		std::ifstream	fp( fileName, std::ios_base::binary );
 		if( fp )
 		{
 			int		c;
@@ -205,19 +204,19 @@ static int tail( const CommandLine &cmdLine )
 
 			if( lineCount )
 			{
-				fseek(fp, 0, SEEK_END );
+				fp.seekg(0, std::ios_base::end );
 				while( lineCount )
 				{
-					fseek( fp, -int(sizeof(buffer)), SEEK_CUR );
-					fread( buffer,sizeof(buffer), 1, fp );
-					fseek( fp, -int(sizeof(buffer)), SEEK_CUR );
+					fp.seekg( -int(sizeof(buffer)), std::ios_base::cur );
+					fp.read( buffer,sizeof(buffer) );
+					fp.seekg( -int(sizeof(buffer)), std::ios_base::cur );
 					for( int i=sizeof(buffer)-1; i>=0; i--, byteCount++ )
 					{
 						c = buffer[i];
 						if( !lineDelimiter && (c=='\r' || c=='\n') )
-							lineDelimiter = c;
+							lineDelimiter = char(c);
 
-						if( c == lineDelimiter )
+						if( char(c) == lineDelimiter )
 						{
 							lineCount--;
 							if( !lineCount )
@@ -228,8 +227,8 @@ static int tail( const CommandLine &cmdLine )
 			}
 			if( byteCount )
 			{
-				fseek( fp, -int(byteCount), SEEK_END );
-				while( (c = fgetc( fp )) != EOF )
+				fp.seekg( -int(byteCount), std::ios_base::end );
+				while( (c = fp.get()) != std::char_traits<char>::eof() )
 				{
 					if( (c != '\r' && c != '\n') )
 						putchar( c );
@@ -244,7 +243,7 @@ static int tail( const CommandLine &cmdLine )
 		}
 	}
 
-	if( fileName == "-" || fileName.isEmpty() )
+	if( fileName.isEmpty() )
 	{
 		if( lineCount )
 			tailLines( lineCount );
