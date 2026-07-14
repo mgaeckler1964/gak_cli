@@ -6,7 +6,7 @@
 		Address:		Hofmannsthalweg 14, A-4030 Linz
 		Web:			https://www.gaeckler.at/
 
-		Copyright:		(c) 1988-2025 Martin Gäckler
+		Copyright:		(c) 1988-2026 Martin Gäckler
 
 		This program is free software: you can redistribute it and/or modify  
 		it under the terms of the GNU General Public License as published by  
@@ -215,7 +215,7 @@ namespace gak
 	};
 }
 
-static std::auto_ptr< ThreadPool<MailIndexerPtr> >	g_IndexerPool;
+static std::unique_ptr< ThreadPool<MailIndexerPtr> >	g_IndexerPool;
 
 namespace gak
 {
@@ -300,9 +300,9 @@ namespace gak
 			STRING		indexFile;
 			STRING		posFile;
 			size_t		idx=0;
-			std::auto_ptr<Mails>		p_theMails(new Mails);
+			std::unique_ptr<Mails>		p_theMails(new Mails);
 			Mails		&theMails = *p_theMails;
-			std::auto_ptr<MboxIndex>	p_mboxIndex(new MboxIndex());
+			std::unique_ptr<MboxIndex>	p_mboxIndex(new MboxIndex());
 			MboxIndex	&mboxIndex = *p_mboxIndex;
 			StopWatch	sw(true);
 

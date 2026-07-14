@@ -692,11 +692,11 @@ static void mirror(
 	clock_t deleteTime = 0;
 	clock_t copyTime = 0;
 
-	std::auto_ptr<TreeCreator>	theTreeCreator;
+	std::unique_ptr<TreeCreator>	theTreeCreator;
 
 	if( createTree && maxAge && exists( destination ) )
 	{
-		theTreeCreator = std::auto_ptr<TreeCreator>( new TreeCreator( destination ) );
+		theTreeCreator = std::unique_ptr<TreeCreator>( new TreeCreator( destination ) );
 	}
 
 	std::ofstream	log;
