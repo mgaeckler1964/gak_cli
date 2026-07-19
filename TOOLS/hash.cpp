@@ -72,6 +72,7 @@ static const int SILENT			= 0x020;
 static const int HASH_FILE		= 0x040;
 static const int EXECUTABLES	= 0x080;
 static const int FORCE_UPDATE	= 0x100;
+static const int TOUCH_CHANGED	= 0x200;
 
 static const uint32 magic = ('h'<<24) | ('a'<<16) | ('s'<<8) | 'h';
 static const uint16 version = 2;
@@ -119,6 +120,14 @@ struct Digests
 	}
 };
 
+enum UpdateMode
+{
+	umNone,		// no update
+	umUpdate,	// update if modified date changed
+	umForce,	// update, if checksum changed
+	umTouch		// also update modified date
+};
+
 typedef TreeMap<F_STRING, Digests>	AllDigestdMap;
 
 // --------------------------------------------------------------------- //
@@ -135,8 +144,9 @@ typedef TreeMap<F_STRING, Digests>	AllDigestdMap;
 
 static gak::CommandLine::Options options[] =
 {
-	{ 'U', "update",		0, 1, UPDATE,		"update the hash file if hash and time has changed" },
-	{ 'F', "force",			0, 1, FORCE_UPDATE,	"allow update the hash file entry if hash has changed, only" },
+	{ 'U', "update",		0, 1, UPDATE,			"update the hash file if hash and time has changed" },
+	{ 'F', "force",			0, 1, FORCE_UPDATE,		"allow update the hash file entry if hash has changed, only" },
+	{ 'T', "touch",			0, 1, TOUCH_CHANGED,	"touch modified files" },
 	{ 'S', "silent",		0, 1, SILENT },
 	{ 'E', "excecutables",	0, 1, EXECUTABLES },
 	{ 'H', "hashFile",		0, 1, HASH_FILE|gak::CommandLine::needArg, "hash file" },
@@ -156,7 +166,7 @@ static gak::CommandLine::Options options[] =
 // --------------------------------------------------------------------- //
 
 static void hash( 
-	const STRING &fileName, bool silent, bool update, bool forceUpdate, AllDigestdMap &allDigests 
+	const STRING &fileName, bool silent, UpdateMode mode, AllDigestdMap &allDigests 
 )
 {
 	ArrayOfData	buffer;
@@ -219,10 +229,19 @@ static void hash(
 		if( allDigests[fileName] != digests )
 		{
 			std::cerr << "File has changed hash, date or time " << fileName << std::endl;
-			if( update && (allDigests[fileName].modifyUTC != digests.modifyUTC || forceUpdate) )
+			if( mode != umNone && (allDigests[fileName].modifyUTC != digests.modifyUTC || mode > umUpdate) )
 			{
 				allDigests[fileName] = digests;
 				std::cerr << "\t\t... updated" << std::endl;
+				if( mode == umTouch && allDigests[fileName].modifyUTC == digests.modifyUTC )
+				{
+#ifdef _Windows
+					unsigned long attr = GetFileAttributes( fileName );
+					attr &= ~FILE_ATTRIBUTE_READONLY;
+					SetFileAttributes( fileName, attr );
+#endif
+					setModTime(fileName, time(nullptr));
+				}
 			}
 		}
 	}
@@ -232,7 +251,7 @@ static void hash(
 	}
 }
 
-static void hashDirectory( const STRING &directoryName, bool silent, bool update, bool forceUpdate, bool executables, AllDigestdMap &allDigests )
+static void hashDirectory( const STRING &directoryName, bool silent, UpdateMode mode, bool executables, AllDigestdMap &allDigests )
 {
 	DirectoryList	dirList;
 	F_STRING	path = directoryName;
@@ -276,12 +295,12 @@ static void hashDirectory( const STRING &directoryName, bool silent, bool update
 			|| extension == "cmd" || extension == "bat" 
 			|| extension == "ttf" || extension == "fon" )
 			{
-				hash( fileName,  silent, update, forceUpdate, allDigests );
+				hash( fileName,  silent, mode, allDigests );
 			}
 		}
 		else
 		{
-			hashDirectory( fileName, silent, update, forceUpdate, executables, allDigests );
+			hashDirectory( fileName, silent, mode, executables, allDigests );
 		}
 	}
 }
@@ -293,8 +312,15 @@ static int hash( const CommandLine &cmdLine )
 	F_STRING	fileArg;
 
 	const bool	silent = cmdLine.flags & SILENT;
-	const bool	update = cmdLine.flags & UPDATE;
-	const bool	forceUpdate = cmdLine.flags & FORCE_UPDATE;
+	UpdateMode	mode;
+	if( cmdLine.flags & TOUCH_CHANGED )
+		mode = umTouch;
+	else if( cmdLine.flags & FORCE_UPDATE )
+		mode = umForce;
+	else if( cmdLine.flags & UPDATE )
+		mode = umUpdate;
+	else
+		mode = umNone;
 	const bool	executables = cmdLine.flags & EXECUTABLES;
 
 	F_STRING	hashFile = cmdLine.flags & HASH_FILE ? cmdLine.parameter['H'][0] : NULL_STRING;
@@ -312,11 +338,11 @@ static int hash( const CommandLine &cmdLine )
 
 		if( isFile( fileArg ) )
 		{
-			hash( fileArg, silent, update, forceUpdate, allDigests );
+			hash( fileArg, silent, mode, allDigests );
 		}
 		else
 		{
-			hashDirectory( fileArg, silent, update, forceUpdate, executables, allDigests );
+			hashDirectory( fileArg, silent, mode, executables, allDigests );
 		}
 	}
 
