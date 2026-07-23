@@ -138,11 +138,11 @@ class TreeCreator
 	{
 		m_error = m_running = m_performed = false;
 	}
-	bool hasPerformed( void ) const
+	bool hasPerformed() const
 	{
 		return m_performed;
 	}
-	bool hasError( void ) const
+	bool hasError() const
 	{
 		return m_error;
 	}
@@ -162,35 +162,35 @@ class CollectorBase : public Thread
 		m_maxQueueLen = maxQueueLen;
 		m_count = m_errorCount = 0;
 	}
-	const DirectoryQueue &getQueue( void ) const
+	const DirectoryQueue &getQueue() const
 	{
 		return m_fileQueue;
 	}
-	DirectoryQueue &getQueue( void )
+	DirectoryQueue &getQueue()
 	{
 		return m_fileQueue;
 	}
-	Locker &getLocker( void )
+	Locker &getLocker()
 	{
 		return m_fileQueue.getLocker();
 	}
-	const Locker &getLocker( void ) const
+	const Locker &getLocker() const
 	{
 		return m_fileQueue.getLocker();
 	}
-	std::size_t getCount( void ) const
+	std::size_t getCount() const
 	{
 		return m_count;
 	}
-	std::size_t getErrorCount( void ) const
+	std::size_t getErrorCount() const
 	{
 		return m_errorCount;
 	}
-	int getLockCount( void ) const
+	int getLockCount() const
 	{
 		return getLocker().getLockCount();
 	}
-	ThreadID getLockedBy( void ) const
+	ThreadID getLockedBy() const
 	{
 		return getLocker().getLockedBy();
 	}
@@ -215,9 +215,9 @@ class CollectorThread : public CollectorBase
 		StartThread("CollectorThread");
 	}
 
-	virtual void ExecuteThread( void );
+	virtual void ExecuteThread();
 
-	const STRING &getSource( void ) const
+	const STRING &getSource() const
 	{
 		return m_sourcePath;
 	}
@@ -230,20 +230,22 @@ class CollectorThread : public CollectorBase
 		return m_completeList.findElement( fileName );
 	}
 
-	const STRING &getBackupPath( void ) const
+	const STRING &getBackupPath( bool useLatest ) const
 	{
 		if( m_backupPath.isEmpty() )
 		{
-			DateTime	latestDate = m_latestDate.calcOriginalTime();
+			DateTime	latestDate = useLatest 
+				? m_latestDate.calcOriginalTime() 
+				: DateTime().calcOriginalTime();
 
 			gak::NumberBuffer tmp[6];
 			STRING	 	nowC = STRING()
-				.add(formatNumberFast(tmp,latestDate.getYear(), 4, '0')).add('_')
+				.add(formatNumberFast(tmp+0,latestDate.getYear(), 4, '0')).add('_')
 				.add(formatNumberFast(tmp+1,int(latestDate.getMonth()), 2, '0')).add('_')
 				.add(formatNumberFast(tmp+2,latestDate.getDay(), 2, '0')).add('_')
-				.add(formatNumberFast(tmp+2,latestDate.getHour(), 2, '0')).add('_')
-				.add(formatNumberFast(tmp+2,latestDate.getMinute(), 2, '0')).add('_')
-				.add(formatNumberFast(tmp+2,latestDate.getSecond(), 2, '0'))
+				.add(formatNumberFast(tmp+3,latestDate.getHour(), 2, '0')).add('_')
+				.add(formatNumberFast(tmp+4,latestDate.getMinute(), 2, '0')).add('_')
+				.add(formatNumberFast(tmp+5,latestDate.getSecond(), 2, '0'))
 			;
 			const_cast<CollectorThread*>(this)->m_backupPath = m_sourcePath + nowC;
 			s_logStrings.push( STRING("Latest File: ") + m_latestFile );
@@ -282,19 +284,19 @@ class CopyFilterThread : public CollectorBase
 	{
 		StartThread("CopyFilterThread");
 	}
-	virtual void ExecuteThread( void );
-	const STRING &getSource( void ) const
+	virtual void ExecuteThread();
+	const STRING &getSource() const
 	{
 		return m_theSrcCollector->getSource();
 	}
-	const STRING &getDestination( void ) const
+	const STRING &getDestination() const
 	{
 		return m_destinationPath;
 	}
-	const STRING &getBackupPath( void ) const
+	const STRING &getBackupPath( bool useLatest ) const
 	{
 		Thread::joinOtherThread( m_theDstCollector );
-		return m_theDstCollector->getBackupPath();
+		return m_theDstCollector->getBackupPath(useLatest);
 	}
 	std::size_t getCheckCount() const
 	{
@@ -335,19 +337,19 @@ class DeleteFilterThread : public CollectorBase
 	{
 		StartThread("DeleteFilterThread");
 	}
-	virtual void ExecuteThread( void );
-	const STRING &getDestination( void ) const
+	virtual void ExecuteThread();
+	const STRING &getDestination() const
 	{
 		return m_theDstCollector->getSource();
 	}
-	const STRING &getSource( void ) const
+	const STRING &getSource() const
 	{
 		return m_sourcePath;
 	}
-	const STRING &getBackupPath( void ) const
+	const STRING &getBackupPath( bool useLatest ) const
 	{
 		Thread::joinOtherThread( m_theDstCollector );
-		return m_theDstCollector->getBackupPath();
+		return m_theDstCollector->getBackupPath(useLatest);
 	}
 };
 
@@ -409,17 +411,17 @@ class CopyThread : public Thread
 	{
 		StartThread("CopyThread");
 	}
-	virtual void ExecuteThread( void );
+	virtual void ExecuteThread();
 
-	std::size_t getCount( void ) const
+	std::size_t getCount() const
 	{
 		return m_count;
 	}
-	std::size_t getErrorCount( void ) const
+	std::size_t getErrorCount() const
 	{
 		return m_errorCount;
 	}
-	std::size_t getAclErrorCount( void ) const
+	std::size_t getAclErrorCount() const
 	{
 		return m_aclErrorCount;
 	}
@@ -474,13 +476,13 @@ class DeleteThread : public Thread
 	{
 		StartThread("DeleteThread");
 	}
-	virtual void ExecuteThread( void );
+	virtual void ExecuteThread();
 
-	std::size_t getCount( void ) const
+	std::size_t getCount() const
 	{
 		return m_count;
 	}
-	const Stack<STRING> &getDirectoryStack( void ) const
+	const Stack<STRING> &getDirectoryStack() const
 	{
 		return m_directories;
 	}
@@ -497,7 +499,7 @@ class CheckSumThread : public Thread
 	{
 		StartThread("CheckSumThread");
 	};
-	virtual void ExecuteThread( void );
+	virtual void ExecuteThread();
 };
 
 // --------------------------------------------------------------------- //
@@ -711,7 +713,7 @@ static void mirror(
 		source, ".mirrorExcludes", maxQueueLen
 	);
 	SharedObjectPointer<CollectorThread>	theDestCollector = new CollectorThread(
-		destination, NULL, maxQueueLen
+		destination, nullptr, maxQueueLen
 	);
 
 
@@ -1070,7 +1072,7 @@ void CollectorThread::scanDirectory( const STRING &dir, const F_STRING &excludes
 // ----- class virtuals ------------------------------------------------ //
 // --------------------------------------------------------------------- //
 
-void CollectorThread::ExecuteThread( void )
+void CollectorThread::ExecuteThread()
 {
 	doEnterFunctionEx(gakLogging::llInfo,"CollectorThread::ExecuteThread");
 
@@ -1080,7 +1082,7 @@ void CollectorThread::ExecuteThread( void )
 }
 
 
-void CopyFilterThread::ExecuteThread( void )
+void CopyFilterThread::ExecuteThread()
 {
 	doEnterFunctionEx(gakLogging::llInfo,"CopyFilterThread::ExecuteThread");
 	bool			inputLocked = false;
@@ -1123,7 +1125,7 @@ void CopyFilterThread::ExecuteThread( void )
 		{
 			doEnterFunctionEx(gakLogging::llDetail,"CopyFilterThread::ExecuteThread::processor");
 			addFile = false;
-			reason = (const char *)NULL;
+			reason = nullptr;
 			DirectoryEntry theSourceEntry = inputQueue.pop();
 			const STRING &theSourceFile = theSourceEntry.fileName;
 			if( waited )
@@ -1276,7 +1278,7 @@ void CopyFilterThread::ExecuteThread( void )
 	}
 }
 
-void DeleteFilterThread::ExecuteThread( void )
+void DeleteFilterThread::ExecuteThread()
 {
 	doEnterFunctionEx(gakLogging::llInfo,"DeleteFilterThread::ExecuteThread");
 
@@ -1346,7 +1348,7 @@ void CopyThread::ExecuteThread()
 	const STRING	&source = m_filter->getSource();
 	const STRING	&destination = m_filter->getDestination();
 
-	STRING			backupPath = m_archiveMode ? m_filter->getBackupPath() : STRING("");
+	STRING			backupPath = m_archiveMode ? m_filter->getBackupPath(m_theTreeCreator != nullptr) : STRING("");
 
 	STRING			tmp = getTempPath();
 
@@ -1400,7 +1402,7 @@ void CopyThread::ExecuteThread()
 							if( m_theTreeCreator->hasError() )
 							{
 								errFile << "Error creating backup directory\n";
-								m_theTreeCreator = NULL;
+								m_theTreeCreator = nullptr;
 							}
 							else
 							{
@@ -1456,7 +1458,7 @@ void CopyThread::ExecuteThread()
 						if( m_theTreeCreator->hasError() )
 						{
 							errFile << "Error creating backup directory\n";
-							m_theTreeCreator = NULL;
+							m_theTreeCreator = nullptr;
 						}
 					}
 					if( !m_theTreeCreator )
@@ -1541,7 +1543,7 @@ void DeleteThread::ExecuteThread()
 
 	bool			inputLocked = false;
 	DirectoryQueue	&deleteQueue = m_filter->getQueue();
-	STRING			backupPath = m_maxAge ? m_filter->getBackupPath() : NULL_STRING;
+	STRING			backupPath = m_maxAge ? m_filter->getBackupPath(m_theTreeCreator != nullptr) : NULL_STRING;
 	const STRING	&destination = m_filter->getDestination();
 	STRING			tmp = getTempPath();
 	STRING			deleteLog =  tmp + DIRECTORY_DELIMITER + "mirror_";
@@ -1582,7 +1584,7 @@ void DeleteThread::ExecuteThread()
 					{
 						m_theTreeCreator->perform( backupPath );
 						if( m_theTreeCreator->hasError() )
-							m_theTreeCreator = NULL;
+							m_theTreeCreator = nullptr;
 						else
 							strRemove( theDestFile.fileName );
 					}
@@ -1614,7 +1616,7 @@ void DeleteThread::ExecuteThread()
 	logFile << "Finished deletion from " << destination << '\n';
 }
 
-void CheckSumThread::ExecuteThread( void )
+void CheckSumThread::ExecuteThread()
 {
 	doEnterFunctionEx(gakLogging::llDetail,"CheckSumThread::ExecuteThread");
 	try
